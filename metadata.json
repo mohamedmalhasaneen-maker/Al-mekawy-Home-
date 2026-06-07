@@ -1,0 +1,6 @@
+{
+  "name": "Al-mekawy Home",
+  "description": "An interactive UPVC windows and doors pricing calculator for AL-MAKKAWY HOME.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
