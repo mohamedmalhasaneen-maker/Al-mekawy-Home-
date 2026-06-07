@@ -12,6 +12,7 @@ import DetailedQuoteView from './components/DetailedQuoteView';
 import SummaryBox from './components/SummaryBox';
 import Features from './components/Features';
 import QrModal from './components/QrModal';
+import AiMekawyChat from './components/AiMekawyChat';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('ar-EG', { 
@@ -245,6 +246,8 @@ export default function App() {
             <QrModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />
           )}
         </AnimatePresence>
+
+        <AiMekawyChat />
 
         {/* Mobile Sticky Bottom Navigation Bar for easy one-handed use */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex items-center gap-3 md:hidden print:hidden">

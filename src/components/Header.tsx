@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Globe, Instagram } from 'lucide-react';
+import { Phone, MessageCircle, Facebook, Instagram } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -82,7 +82,7 @@ export default function Header() {
                 rel="noreferrer" 
                 className="bg-[#1877F2] hover:bg-[#155fc0] text-white px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
               >
-                <Globe size={13} />
+                <Facebook size={13} />
                 <span className="hidden sm:inline">فيسبوك</span>
               </a>
               <a 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CustomerInfo, CalculatedItem, CalculationResult } from '../types';
 import { PROFILES, ADDONS } from '../constants';
-import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram } from 'lucide-react';
+import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram, Facebook } from 'lucide-react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
 interface Props {
@@ -301,7 +301,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               rel="noreferrer" 
               className="py-2.5 px-5 bg-[#1877F2] text-white hover:bg-[#155fc0] text-xs font-black rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
             >
-              <Globe size={14} />
+              <Facebook size={14} />
               فيسبوك
               <ExternalLink size={12} />
             </a>
