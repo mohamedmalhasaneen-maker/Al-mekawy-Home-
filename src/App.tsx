@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Calculator } from 'lucide-react';
+import { Plus, Calculator, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { QuoteItem, CalculationResult, CustomerInfo } from './types';
@@ -11,6 +11,7 @@ import CustomerForm from './components/CustomerForm';
 import DetailedQuoteView from './components/DetailedQuoteView';
 import SummaryBox from './components/SummaryBox';
 import Features from './components/Features';
+import QrModal from './components/QrModal';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('ar-EG', { 
@@ -21,6 +22,7 @@ const formatCurrency = (value: number) => {
 };
 
 export default function App() {
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: '',
     phone: '',
@@ -32,6 +34,7 @@ export default function App() {
     {
       id: Date.now(),
       title: 'بند رقم 1 (مثال: شباك غرفه)',
+      itemType: 'window',
       width: 120,
       height: 120,
       profile: 'newline',
@@ -47,6 +50,7 @@ export default function App() {
       {
         id: Date.now(),
         title: `بند رقم ${items.length + 1}`,
+        itemType: 'window',
         width: 100,
         height: 100,
         profile: 'newline',
@@ -81,6 +85,14 @@ export default function App() {
                  const index = newAddons.indexOf('blackout');
                  if (index > -1) newAddons.splice(index, 1);
             }
+            if (value.includes('doubleGlass') && item.addons.indexOf('doubleGlass') === -1) {
+                 const index = newAddons.indexOf('colorGlass');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
+            if (value.includes('colorGlass') && item.addons.indexOf('colorGlass') === -1) {
+                 const index = newAddons.indexOf('doubleGlass');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
             updatedItem.addons = newAddons;
         }
 
@@ -112,8 +124,9 @@ export default function App() {
       const h = item.height || 0;
       let area = (w * h) / 10000;
       
-      // Industrial norm: minimum 1m² per item
-      if (area > 0 && area < 1) area = 1; 
+      // Industrial norm: minimum 1m² for both windows and doors
+      const minArea = 1.0;
+      if (area > 0 && area < minArea) area = minArea; 
       
       totalArea += area;
 
@@ -142,7 +155,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-105 selection:bg-yellow-200 selection:text-[#0F172A]" dir="rtl">
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-105 selection:bg-yellow-200 selection:text-[#0F172A] pb-24 md:pb-0" dir="rtl">
       <Header />
 
       <main className="max-w-5xl mx-auto px-4 py-12">
@@ -162,7 +175,7 @@ export default function App() {
 
         <CustomerForm customer={customer} onChange={handleCustomerChange} />
 
-        <div className="space-y-8">
+        <div className="space-y-8 print:hidden">
           <AnimatePresence mode="popLayout" initial={false}>
             {calculations.itemsCalculated.map((item, index) => (
               <ItemCard 
@@ -183,7 +196,7 @@ export default function App() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={addNewItem}
-            className="flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
+            className="hidden md:flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
           >
             <Plus size={28} />
             إضافة بند جديد (شباك / باب)
@@ -202,10 +215,22 @@ export default function App() {
           formatCurrency={formatCurrency}
         />
 
-        <Features />
+        <div className="print:hidden">
+          <Features />
+        </div>
 
-        <footer className="mt-20 text-center text-slate-400 text-sm print:mt-10 border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="font-extrabold tracking-wide text-xs text-slate-400">© {new Date().getFullYear()} AL-MAKKAWI HOME • ALL RIGHTS RESERVED</p>
+        <footer className="mt-20 text-center text-slate-400 text-sm print:hidden border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <p className="font-extrabold tracking-wide text-xs text-slate-400">© {new Date().getFullYear()} AL-MAKKAWI HOME • ALL RIGHTS RESERVED</p>
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(true)}
+              className="px-3.5 py-1.5 bg-[#0F172A]/5 hover:bg-[#FACC15] hover:text-[#0F172A] text-[#0F172A] border border-slate-200 hover:border-transparent transition-all duration-200 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm hover:shadow active:scale-95 cursor-pointer"
+            >
+              <QrCode size={13} />
+              <span>رمز الاستجابة السريعة (QR)</span>
+            </button>
+          </div>
           <div className="flex gap-4 text-xs font-black uppercase text-[#0F172A]">
             <span>خامات معتمدة</span>
             <span>•</span>
@@ -214,6 +239,35 @@ export default function App() {
             <span>معاينة مجانية</span>
           </div>
         </footer>
+
+        <AnimatePresence>
+          {isQrModalOpen && (
+            <QrModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />
+          )}
+        </AnimatePresence>
+
+        {/* Mobile Sticky Bottom Navigation Bar for easy one-handed use */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex items-center gap-3 md:hidden print:hidden">
+          <button
+            type="button"
+            onClick={addNewItem}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#0F172A] hover:bg-black text-white py-4 rounded-2xl font-black text-base shadow-lg active:scale-95 transition-all text-center cursor-pointer"
+          >
+            <Plus size={20} />
+            <span>إضافة بند جديد</span>
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-5 py-4 bg-amber-500 hover:bg-amber-600 text-[#0F172A] rounded-2xl font-black text-sm shadow-md active:scale-95 transition-all text-center cursor-pointer flex items-center gap-1.5"
+            title="طباعة عرض السعر"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2-2v4" />
+            </svg>
+            <span>طباعة</span>
+          </button>
+        </div>
       </main>
 
       <style dangerouslySetInnerHTML={{__html: `

@@ -25,6 +25,7 @@ export interface Addon {
 export interface QuoteItem {
   id: number;
   title: string;
+  itemType: 'window' | 'door';
   width: number;
   height: number;
   profile: string;

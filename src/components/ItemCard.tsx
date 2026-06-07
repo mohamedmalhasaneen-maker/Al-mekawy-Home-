@@ -71,9 +71,16 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                 className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold"
               />
             </div>
-            <div className="bg-[#F8F9FA] p-3 rounded-xl border border-slate-200/60 print:bg-transparent print:p-0 print:border-none">
-              <span className="text-sm text-slate-500 font-bold">المساحة: </span>
-              <span className="text-base text-[#0F172A] font-black">{item.area.toFixed(2)} م²</span>
+            <div className="bg-[#F8F9FA] p-3 rounded-xl border border-slate-200/60 print:bg-transparent print:p-0 print:border-none space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500 font-bold">المساحة:</span>
+                <span className="text-base text-[#0F172A] font-black">{item.area.toFixed(2)} م²</span>
+              </div>
+              {((item.width * item.height) / 10000) < 1.0 && (
+                <div className="text-[10px] text-amber-600 font-extrabold text-right">
+                  * تم تطبيق الحد الأدنى (1.0 م²)
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -82,6 +89,27 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
         <div className="col-span-1 lg:col-span-2 space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المواصفات</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+            <div>
+              <label className="block text-xs font-extrabold text-[#64748B] mb-1.5 uppercase tracking-wider">نوع البند</label>
+              <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl print:hidden">
+                <button
+                  type="button"
+                  onClick={() => updateItem(item.id, 'itemType', 'window')}
+                  className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'window' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-55'}`}
+                >
+                  شباك
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateItem(item.id, 'itemType', 'door')}
+                  className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-55'}`}
+                >
+                  باب
+                </button>
+              </div>
+              <div className="hidden print:block font-bold text-slate-905">{item.itemType === 'door' ? 'باب' : 'شباك'}</div>
+            </div>
+
             <div>
               <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">نوع القطاع (UPVC)</label>
               <select
@@ -127,19 +155,66 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
         <div className="space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">إضافات اختيارية</h3>
           <div className="grid grid-cols-1 gap-2.5">
-            {Object.entries(ADDONS).map(([key, addon]) => (
-              <label key={key} className="flex items-center gap-3 p-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group">
-                <input
-                  type="checkbox"
-                  checked={item.addons.includes(key)}
-                  onChange={() => toggleAddon(item.id, key)}
-                  className="w-4 h-4 text-[#0F172A] rounded border-gray-300 focus:ring-[#FACC15] cursor-pointer"
-                />
-                <span className="text-sm text-slate-700 font-bold group-hover:text-[#0F172A] transition-colors">
-                  {addon.name}
-                </span>
-              </label>
-            ))}
+            {Object.entries(ADDONS).map(([key, addon]) => {
+              const isDoubleGlass = key === 'doubleGlass';
+              const isColorGlass = key === 'colorGlass';
+              const isPleated = key === 'pleated';
+              const isBlackout = key === 'blackout';
+
+              // Determine if disabled because of a mutually exclusive selection
+              const isDisabled = 
+                (isDoubleGlass && item.addons.includes('colorGlass')) ||
+                (isColorGlass && item.addons.includes('doubleGlass')) ||
+                (isPleated && item.addons.includes('blackout')) ||
+                (isBlackout && item.addons.includes('pleated'));
+
+              // Friendly conflict explanations in Arabic
+              let conflictTag = '';
+              if (isDoubleGlass && item.addons.includes('colorGlass')) {
+                conflictTag = ' (تم اختيار ألوان خاصة)';
+              } else if (isColorGlass && item.addons.includes('doubleGlass')) {
+                conflictTag = ' (تم اختيار زجاج عادي)';
+              } else if (isPleated && item.addons.includes('blackout')) {
+                conflictTag = ' (تم اختيار بلاك أوت)';
+              } else if (isBlackout && item.addons.includes('pleated')) {
+                conflictTag = ' (تم اختيار سلك بليسيه)';
+              }
+
+              return (
+                <label 
+                  key={key} 
+                  className={`flex items-center justify-between p-1.5 rounded-lg transition-colors duration-200 ${
+                    isDisabled 
+                      ? 'opacity-40 cursor-not-allowed bg-slate-50/50' 
+                      : 'hover:bg-slate-50 cursor-pointer group'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={item.addons.includes(key)}
+                      disabled={isDisabled}
+                      onChange={() => !isDisabled && toggleAddon(item.id, key)}
+                      className={`w-4 h-4 text-[#0F172A] rounded border-gray-300 focus:ring-[#FACC15] ${
+                        isDisabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer'
+                      }`}
+                    />
+                    <span className={`text-sm font-bold transition-colors duration-200 ${
+                      isDisabled 
+                        ? 'text-slate-400' 
+                        : 'text-slate-700 group-hover:text-[#0F172A]'
+                    }`}>
+                      {addon.name}
+                    </span>
+                  </div>
+                  {isDisabled && (
+                    <span className="text-[10px] text-amber-600 font-extrabold px-1.5 py-0.5 bg-amber-50 rounded">
+                      {conflictTag}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CustomerInfo, CalculatedItem, CalculationResult } from '../types';
 import { PROFILES, ADDONS } from '../constants';
-import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp } from 'lucide-react';
+import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram } from 'lucide-react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
 interface Props {
@@ -120,7 +120,8 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
             </thead>
             <tbody className="divide-y divide-slate-200">
               {calculations.itemsCalculated.map((item, idx) => {
-                const isMinArea = (item.width * item.height) / 10000 < 1;
+                const threshold = 1.0;
+                const isMinArea = (item.width * item.height) / 10000 < threshold;
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors print:hover:bg-transparent">
                     {/* Item Serial */}
@@ -130,7 +131,12 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                     
                     {/* Title */}
                     <td className="py-4 px-4 border-l border-slate-100">
-                      <div className="font-bold text-slate-900 text-base">{item.title}</div>
+                      <div className="font-bold text-slate-900 text-base flex items-center gap-2">
+                        {item.title}
+                        <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded print:bg-slate-200">
+                          {item.itemType === 'door' ? 'باب' : 'شباك'}
+                        </span>
+                      </div>
                       <div className="text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
                     </td>
 
@@ -143,8 +149,8 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                     <td className="py-4 px-3 text-center border-l border-slate-100">
                       <div className="font-bold text-[#0F172A]">{item.area.toFixed(2)} م²</div>
                       {isMinArea && (
-                        <div className="text-[10px] text-amber-600 font-extrabold mt-0.5 whitespace-nowrap">
-                          (الحد الأدنى الصناعي 1 م²)
+                        <div className="text-[10px] text-amber-600 font-extrabold mt-0.5 whitespace-nowrap print:text-amber-700">
+                          (الحد الأدنى الصناعي {threshold.toFixed(1)} م²)
                         </div>
                       )}
                     </td>
@@ -272,14 +278,14 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               className="py-2.5 px-4 bg-[#0F172A] text-white hover:bg-black text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer"
             >
               <Phone size={14} />
-              اتصال: +20 1141761261
+              اتصال: 01141761261
             </a>
             <a 
               href="tel:+201060524985" 
               className="py-2.5 px-4 bg-[#0F172A] text-white hover:bg-black text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer"
             >
               <Phone size={14} />
-              اتصال: +20 1060524985
+              اتصال: 01060524985
             </a>
             <a 
               href="https://wa.me/201141761261" 
@@ -287,7 +293,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               rel="noreferrer" 
               className="py-2.5 px-4 bg-green-650 text-white hover:bg-green-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>واتساب: +20 1141761261</span>
+              <span>واتساب: 01141761261</span>
             </a>
             <a 
               href="https://www.facebook.com/share/1Bfwi9XFow/" 
@@ -296,7 +302,29 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               className="py-2.5 px-5 bg-[#1877F2] text-white hover:bg-[#155fc0] text-xs font-black rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
             >
               <Globe size={14} />
-              صفحتنا على فيسبوك
+              فيسبوك
+              <ExternalLink size={12} />
+            </a>
+            <a 
+              href="https://www.instagram.com/almekawy.home?igsh=bXBqZmw3NGt4bzVs" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="py-2.5 px-5 bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F56040] hover:opacity-95 text-white text-xs font-black rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+            >
+              <Instagram size={14} />
+              إنستغرام
+              <ExternalLink size={12} />
+            </a>
+            <a 
+              href="https://www.tiktok.com/@almekawy.home?_r=1&_t=ZS-971BmNPuWbk" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="py-2.5 px-5 bg-black hover:bg-slate-900 text-white text-xs font-black rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer border border-slate-800"
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" className="inline">
+                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.01 1.62 4.14.99 1.13 2.37 1.83 3.84 2.01v3.98c-1.42-.02-2.83-.37-4.11-1.02-.78-.4-1.48-.95-2.05-1.63V15.5c-.01 2.22-.9 4.34-2.48 5.86-1.58 1.52-3.76 2.32-5.98 2.21-2.41-.12-4.66-1.4-5.88-3.5-1.22-2.09-1.29-4.71-.16-6.86 1.12-2.14 3.32-3.53 5.75-3.64v3.95c-1.12.06-2.17.69-2.73 1.67-.56.97-.56 2.18-.01 3.16.55.98 1.58 1.63 2.7 1.7 1.16.07 2.29-.41 2.97-1.35.53-.73.74-1.64.74-2.54V.02h.64z" />
+              </svg>
+              تيك توك
               <ExternalLink size={12} />
             </a>
           </div>

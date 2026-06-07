@@ -14,7 +14,7 @@ export default function SummaryBox({ calculations, formatCurrency, handlePrint }
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="mt-12 bg-[#F1F5F9] border-2 border-slate-200 rounded-3xl p-8 md:p-10 relative overflow-hidden print:bg-white print:text-black print:border-none print:shadow-none print:rounded-none lg:flex lg:flex-row lg:items-center lg:justify-between lg:gap-8"
+      className="mt-12 bg-[#F1F5F9] border-2 border-slate-200 rounded-3xl p-8 md:p-10 relative overflow-hidden print:hidden lg:flex lg:flex-row lg:items-center lg:justify-between lg:gap-8"
     >
       <div className="max-w-xl text-right flex-1 mb-8 lg:mb-0">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 font-display">عرض الاسعار الاجمالي</h3>
