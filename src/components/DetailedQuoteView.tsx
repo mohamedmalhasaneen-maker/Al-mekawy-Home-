@@ -1,7 +1,9 @@
 import React from 'react';
 import { CustomerInfo, CalculatedItem, CalculationResult } from '../types';
 import { PROFILES, ADDONS } from '../constants';
-import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram, Facebook } from 'lucide-react';
+import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram, Facebook, Download, MessageCircle } from 'lucide-react';
+import jspdf from 'jspdf';
+import * as htmlToImage from 'html-to-image';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
 interface Props {
@@ -11,14 +13,70 @@ interface Props {
 }
 
 export default function DetailedQuoteView({ customer, calculations, formatCurrency }: Props) {
+  const [isExporting, setIsExporting] = React.useState(false);
   const quoteNumber = React.useMemo(() => {
     const today = new Date();
     const random = Math.floor(100 + Math.random() * 900);
     return `MH-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}-${random}`;
   }, []);
 
+  const exportToPdf = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    
+    // Give react time to render with isExporting class updates
+    setTimeout(async () => {
+      try {
+        const element = document.getElementById('quotation-print-sheet');
+        if (!element) return;
+
+        const width = element.offsetWidth || 1120;
+        const height = element.offsetHeight || 1600;
+
+        const imgData = await htmlToImage.toPng(element, {
+          quality: 0.98,
+          backgroundColor: '#ffffff',
+          pixelRatio: 2,
+          style: {
+            transform: 'scale(1)',
+            transformOrigin: 'top right'
+          }
+        });
+
+        const pdf = new jspdf('p', 'mm', 'a4');
+        const imgWidth = 210; // A4 standard width in mm
+        const pageHeight = 297; // A4 standard height in mm
+        const imgHeight = (height * imgWidth) / width;
+
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        // First page
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+
+        // Subsequent page slicing
+        let pageNum = 1;
+        while (heightLeft > 0) {
+          position = - (pageNum * pageHeight);
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+          heightLeft -= pageHeight;
+          pageNum++;
+        }
+
+        const clientNameClean = (customer.name || 'عميل').trim().replace(/\s+/g, '_');
+        pdf.save(`عرض_سعر_المكاوي_${clientNameClean}.pdf`);
+      } catch (err) {
+        console.error('Error generating PDF:', err);
+      } finally {
+        setIsExporting(false);
+      }
+    }, 150);
+  };
+
   return (
-    <div className="mt-16 bg-white border-2 border-slate-300 rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none">
+    <div id="detailed-quote-view" className="mt-16 bg-white border-2 border-slate-300 rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none">
       
       {/* Visual Indicator of Quotation Form */}
       <div className="bg-[#0F172A] text-white p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b-4 border-[#FACC15] print:hidden">
@@ -34,13 +92,25 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
             هذا هو الشكل النهائي لعرض السعر الذي سيتم طباعته أو حفظه كـ PDF ليُقدّم للعميل المحترم بصورة رسمية.
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="bg-[#FACC15] hover:bg-yellow-400 text-[#0F172A] px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition duration-200 active:scale-95 cursor-pointer shrink-0 self-start lg:self-center"
-        >
-          <FileText size={18} />
-          طباعة عرض السعر التفصيلي للعميل
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 shrink-0 self-start lg:self-center w-full sm:w-auto">
+          <button
+            onClick={exportToPdf}
+            disabled={isExporting}
+            className="bg-[#FACC15] hover:bg-yellow-400 text-[#0F172A] px-6 py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition duration-200 active:scale-95 cursor-pointer disabled:opacity-60"
+          >
+            {isExporting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-[#0F172A] border-t-transparent rounded-full animate-spin"></span>
+                <span>جاري حفظ الـ PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download size={18} />
+                <span>تحميل ملف PDF منظم</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Actual Statement Sheet Area */}
@@ -267,7 +337,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
 
         {/* Interactive Clickable Links (Requested by User) */}
-        <div className="mt-10 p-5 bg-[#F8F9FA] rounded-2xl border-2 border-dashed border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 print:hidden">
+        <div className={`mt-10 p-5 bg-[#F8F9FA] rounded-2xl border-2 border-dashed border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 print:hidden ${isExporting ? '!hidden' : ''}`}>
           <div className="text-right">
             <h4 className="font-bold text-[#0F172A]">روابط التواصل السريع والتفاعل</h4>
             <p className="text-xs text-slate-500">انقر على أي مما يلي للتواصل الفوري أو الانتقال لموقعنا الرسمي</p>
@@ -291,8 +361,9 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               href="https://wa.me/201141761261" 
               target="_blank" 
               rel="noreferrer" 
-              className="py-2.5 px-4 bg-green-650 text-white hover:bg-green-700 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+              className="py-2.5 px-4 bg-[#25D366] text-white hover:bg-[#20ba5a] text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-green-950/10 hover:shadow-lg active:scale-95 ring-2 ring-emerald-400/20"
             >
+              <MessageCircle size={14} className="text-white" />
               <span>واتساب: 01141761261</span>
             </a>
             <a 
@@ -347,7 +418,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         {/* Small footer citation */}
         <div className="mt-10 border-t border-slate-100 pt-4 flex justify-between items-center text-[10px] text-slate-400 font-extrabold tracking-widest uppercase">
           <p>© {new Date().getFullYear()} AL-MAKKAWI HOME • OFFICIAL QUOTATION</p>
-          <p className="hidden print:block flex items-center gap-1">
+          <p className={`hidden print:block flex items-center gap-1 ${isExporting ? '!flex' : ''}`}>
             <span>فيسبوك: </span>
             <span className="font-mono text-slate-800 lowercase">https://www.facebook.com/share/1Bfwi9XFow/</span>
           </p>

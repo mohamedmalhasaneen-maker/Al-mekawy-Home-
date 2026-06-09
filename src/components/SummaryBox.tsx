@@ -1,4 +1,4 @@
-import { Printer } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { CalculationResult } from '../types';
 import { motion } from 'motion/react';
 
@@ -38,14 +38,6 @@ export default function SummaryBox({ calculations, formatCurrency, handlePrint }
             </div>
           </div>
         </div>
-
-        <button
-          onClick={handlePrint}
-          className="w-full bg-[#FACC15] text-[#0F172A] hover:bg-yellow-400 py-4.5 rounded-2xl font-black text-lg shadow-lg hover:scale-[1.02] transition active:scale-95 flex items-center justify-center gap-3 print:hidden"
-        >
-          <Printer size={22} />
-          طباعة أو حفظ كـ PDF
-        </button>
       </div>
     </motion.div>
   );
