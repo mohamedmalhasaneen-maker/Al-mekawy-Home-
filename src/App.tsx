@@ -10,6 +10,7 @@ import ItemCard from './components/ItemCard';
 import CustomerForm from './components/CustomerForm';
 import DetailedQuoteView from './components/DetailedQuoteView';
 import SummaryBox from './components/SummaryBox';
+import PricingTable from './components/PricingTable';
 import Features from './components/Features';
 import QrModal from './components/QrModal';
 import AiMekawyChat from './components/AiMekawyChat';
@@ -181,6 +182,8 @@ export default function App() {
             أدخل مقاسات الفتحات لديك (العرض والارتفاع بالسنتيمتر)، ثم اختر نوع القطاع والإضافات التي ترغب بها لكل بند. سيقوم النظام تلقائياً بحساب المساحات (المتر المربع) وعرض التكلفة الإجمالية بدقة وبشفافية تامة.
           </p>
         </motion.div>
+
+        <PricingTable />
 
         <CustomerForm customer={customer} onChange={handleCustomerChange} />
 
