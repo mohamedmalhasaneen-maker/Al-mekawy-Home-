@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 
 interface Props {
   customer: CustomerInfo;
-  onChange: (field: keyof CustomerInfo, value: string) => void;
+  onChange: (field: keyof CustomerInfo, value: any) => void;
 }
 
 export default function CustomerForm({ customer, onChange }: Props) {
@@ -19,7 +19,7 @@ export default function CustomerForm({ customer, onChange }: Props) {
         <div>
           <h2 className="text-2xl font-display font-black text-[#0F172A] flex items-center gap-3">
             <User className="text-[#0F172A]" size={26} />
-            بيانات العميل والموقع
+            بيانات العميل والمشروع
           </h2>
           <p className="text-slate-500 text-sm mt-1">
             أدخل بيانات العميل ليتم توليد وتصميم عرض سعر رسمي مفصل باسمه ومقاسات مشروعه الخاصة تلقائياً.

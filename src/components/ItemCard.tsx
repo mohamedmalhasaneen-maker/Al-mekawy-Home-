@@ -1,8 +1,8 @@
-import React from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2, ChevronDown, ChevronUp, Sliders, Check } from 'lucide-react';
 import { CalculatedItem } from '../types';
 import { PROFILES, ADDONS, GLASS_TYPES, OPENING_TYPES } from '../constants';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   item: CalculatedItem;
@@ -15,6 +15,9 @@ interface Props {
 
 const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggleAddon, formatCurrency }) => {
   const itemNumber = String(index + 1).padStart(2, '0');
+  const [isAddonsOpen, setIsAddonsOpen] = useState(false);
+
+  const activeAddons = item.addons.filter(key => ADDONS[key]);
 
   return (
     <motion.div 
@@ -33,50 +36,54 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
             type="text"
             value={item.title}
             onChange={(e) => updateItem(item.id, 'title', e.target.value)}
-            className="bg-transparent font-display font-black text-xl text-[#0F172A] focus:outline-none focus:border-b-2 focus:border-[#0F172A] w-1/2 print:border-none print:w-auto"
+            className="bg-transparent font-display font-black text-lg sm:text-xl text-[#0F172A] focus:outline-none focus:border-b-2 focus:border-[#0F172A] w-3/4 sm:w-1/2 print:border-none print:w-auto"
             placeholder="اسم البند (مثال: شباك المطبخ)"
           />
         </div>
         <button 
           onClick={() => removeItem(item.id)}
-          className="text-red-500 hover:text-red-700 p-2.5 rounded-full hover:bg-red-50 transition print:hidden"
+          className="text-red-500 hover:text-red-700 p-2.5 rounded-full hover:bg-red-50 transition print:hidden cursor-pointer"
           title="حذف البند"
         >
           <Trash2 size={20} />
         </button>
       </div>
 
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
         {/* المقاسات */}
         <div className="space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المقاسات</h3>
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العرض (سم)</label>
-              <input
-                type="number"
-                min="0"
-                value={item.width}
-                onChange={(e) => updateItem(item.id, 'width', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold"
-              />
+            {/* Display side by side on mobile/tablet, vertically stacked on desktop */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العرض (سم)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={item.width || ''}
+                  onChange={(e) => updateItem(item.id, 'width', e.target.value ? Number(e.target.value) : 0)}
+                  className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center sm:text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">الارتفاع (سم)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={item.height || ''}
+                  onChange={(e) => updateItem(item.id, 'height', e.target.value ? Number(e.target.value) : 0)}
+                  className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center sm:text-right"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">الارتفاع (سم)</label>
-              <input
-                type="number"
-                min="0"
-                value={item.height}
-                onChange={(e) => updateItem(item.id, 'height', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold"
-              />
-            </div>
+            
             <div className="bg-[#F8F9FA] p-3 rounded-xl border border-slate-200/60 print:bg-transparent print:p-0 print:border-none space-y-1">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500 font-bold">المساحة:</span>
                 <span className="text-base text-[#0F172A] font-black">{item.area.toFixed(2)} م²</span>
               </div>
-              {((item.width * item.height) / 10000) < 1.0 && (
+              {((item.width * item.height) / 10000) < 1.0 && (item.width > 0 && item.height > 0) && (
                 <div className="text-[10px] text-amber-600 font-extrabold text-right">
                   * تم تطبيق الحد الأدنى (1.0 م²)
                 </div>
@@ -86,28 +93,37 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
         </div>
 
         {/* المواصفات الأساسية */}
-        <div className="col-span-1 lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المواصفات</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className="block text-xs font-extrabold text-[#64748B] mb-1.5 uppercase tracking-wider">نوع البند</label>
-              <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl print:hidden">
+              <div className="flex gap-1 bg-slate-100 p-1 rounded-xl print:hidden">
                 <button
                   type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'window')}
-                  className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'window' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-55'}`}
+                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'window' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   شباك
                 </button>
                 <button
                   type="button"
+                  onClick={() => updateItem(item.id, 'itemType', 'balcony')}
+                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'balcony' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
+                >
+                  بلكونة
+                </button>
+                <button
+                  type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'door')}
-                  className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-55'}`}
+                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   باب
                 </button>
               </div>
-              <div className="hidden print:block font-bold text-slate-905">{item.itemType === 'door' ? 'باب' : 'شباك'}</div>
+              <div className="hidden print:block font-bold text-slate-900">
+                {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
+              </div>
             </div>
 
             <div>
@@ -115,7 +131,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               <select
                 value={item.profile}
                 onChange={(e) => updateItem(item.id, 'profile', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
               >
                 {Object.entries(PROFILES).map(([key, profile]) => (
                   <option key={key} value={key}>{profile.name}</option>
@@ -128,7 +144,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               <select
                 value={item.opening}
                 onChange={(e) => updateItem(item.id, 'opening', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
               >
                 {OPENING_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -141,7 +157,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               <select
                 value={item.glassType}
                 onChange={(e) => updateItem(item.id, 'glassType', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
               >
                 {GLASS_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -151,24 +167,42 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
           </div>
         </div>
 
-        {/* الإضافات */}
+        {/* الإضافات - Responsive & Mobile-friendly collapsible design */}
         <div className="space-y-4">
-          <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">إضافات اختيارية</h3>
-          <div className="grid grid-cols-1 gap-2.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 className="font-black text-[#0F172A] text-sm uppercase tracking-wider">إضافات اختيارية</h3>
+            <span className="hidden lg:inline text-xs text-slate-400 font-extrabold">({activeAddons.length}) مختار</span>
+          </div>
+
+          {/* Desktop-only view of all addons always expanded */}
+          <div className="hidden lg:grid grid-cols-1 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
             {Object.entries(ADDONS).map(([key, addon]) => {
               const isDoubleGlass = key === 'doubleGlass';
               const isColorGlass = key === 'colorGlass';
               const isPleated = key === 'pleated';
               const isBlackout = key === 'blackout';
+              const isSkewWindow1 = key === 'skewWindow1';
+              const isSkewWindow2 = key === 'skewWindow2';
+              const isSkewBalcony1 = key === 'skewBalcony1';
+              const isSkewBalcony2 = key === 'skewBalcony2';
 
-              // Determine if disabled because of a mutually exclusive selection
+              const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
+              const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
+              const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
+
               const isDisabled = 
                 (isDoubleGlass && item.addons.includes('colorGlass')) ||
                 (isColorGlass && item.addons.includes('doubleGlass')) ||
                 (isPleated && item.addons.includes('blackout')) ||
-                (isBlackout && item.addons.includes('pleated'));
+                (isBlackout && item.addons.includes('pleated')) ||
+                (isSkewWindow1 && item.addons.includes('skewWindow2')) ||
+                (isSkewWindow2 && item.addons.includes('skewWindow1')) ||
+                (isSkewBalcony1 && item.addons.includes('skewBalcony2')) ||
+                (isSkewBalcony2 && item.addons.includes('skewBalcony1')) ||
+                (isBalconyAddon && item.itemType !== 'balcony') ||
+                (isWindowAddon && item.itemType !== 'window') ||
+                (isDoorForbiddenAddon && item.itemType === 'door');
 
-              // Friendly conflict explanations in Arabic
               let conflictTag = '';
               if (isDoubleGlass && item.addons.includes('colorGlass')) {
                 conflictTag = ' (تم اختيار ألوان خاصة)';
@@ -178,55 +212,265 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                 conflictTag = ' (تم اختيار بلاك أوت)';
               } else if (isBlackout && item.addons.includes('pleated')) {
                 conflictTag = ' (تم اختيار سلك بليسيه)';
+              } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
+                conflictTag = ' (تم اختيار ضلفتين)';
+              } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {
+                conflictTag = ' (تم اختيار ضلفة واحدة)';
+              } else if (isSkewBalcony1 && item.addons.includes('skewBalcony2')) {
+                conflictTag = ' (تم اختيار ضلفتين)';
+              } else if (isSkewBalcony2 && item.addons.includes('skewBalcony1')) {
+                conflictTag = ' (تم اختيار ضلفة واحدة)';
+              } else if (isBalconyAddon && item.itemType !== 'balcony') {
+                conflictTag = ' (متاح للبلكونات فقط)';
+              } else if (isWindowAddon && item.itemType !== 'window') {
+                conflictTag = ' (متاح للشبابيك فقط)';
+              } else if (isDoorForbiddenAddon && item.itemType === 'door') {
+                conflictTag = ' (غير متاح للأبواب)';
               }
 
+              const formatAddonPrice = (ad: typeof addon) => {
+                if (ad.id === 'panda') return 'متر × 1.5';
+                if (ad.isFlat) {
+                  return `+${ad.price} ج.م`;
+                }
+                return `+${ad.price} ج.م/م²`;
+              };
+
               return (
-                <label 
+                <div 
                   key={key} 
-                  className={`flex items-center justify-between p-1.5 rounded-lg transition-colors duration-200 ${
-                    isDisabled 
-                      ? 'opacity-40 cursor-not-allowed bg-slate-50/50' 
-                      : 'hover:bg-slate-50 cursor-pointer group'
+                  className={`p-2 rounded-xl transition-all duration-200 border-2 ${
+                    item.addons.includes(key)
+                      ? 'bg-[#FDFBF7] border-[#FACC15]'
+                      : 'bg-white border-transparent'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={item.addons.includes(key)}
-                      disabled={isDisabled}
-                      onChange={() => !isDisabled && toggleAddon(item.id, key)}
-                      className={`w-4 h-4 text-[#0F172A] rounded border-gray-300 focus:ring-[#FACC15] ${
-                        isDisabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer'
-                      }`}
-                    />
-                    <span className={`text-sm font-bold transition-colors duration-200 ${
+                  <label 
+                    className={`flex items-start justify-between gap-2.5 ${
                       isDisabled 
-                        ? 'text-slate-400' 
-                        : 'text-slate-700 group-hover:text-[#0F172A]'
-                    }`}>
-                      {addon.name}
-                    </span>
-                  </div>
+                        ? 'opacity-40 cursor-not-allowed' 
+                        : 'cursor-pointer group'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={item.addons.includes(key)}
+                        disabled={isDisabled}
+                        onChange={() => !isDisabled && toggleAddon(item.id, key)}
+                        className={`w-4.5 h-4.5 mt-0.5 text-[#0F172A] rounded border-slate-300 focus:ring-[#FACC15] ${
+                          isDisabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer'
+                        }`}
+                      />
+                      <div className="flex flex-col text-right">
+                        <span className={`text-sm font-black transition-colors duration-200 ${
+                          isDisabled 
+                            ? 'text-slate-400 line-through' 
+                            : 'text-slate-800 group-hover:text-[#0F172A]'
+                        }`}>
+                          {addon.name}
+                        </span>
+                        {key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' ? (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            نظام المفصلي قلاب
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    
+                    <div className="text-left shrink-0">
+                      <span className="text-[10.5px] font-extrabold font-mono bg-slate-100 text-[#0F172A] px-2 py-0.5 rounded-lg border border-slate-200/60 inline-block">
+                        {formatAddonPrice(addon)}
+                      </span>
+                    </div>
+                  </label>
                   {isDisabled && (
-                    <span className="text-[10px] text-amber-600 font-extrabold px-1.5 py-0.5 bg-amber-50 rounded">
-                      {conflictTag}
-                    </span>
+                    <div className="text-[10px] text-amber-600 font-extrabold mr-7 mt-0.5">
+                      ⚠️{conflictTag}
+                    </div>
                   )}
-                </label>
+                </div>
               );
             })}
+          </div>
+
+          {/* Collapsible Mobile/Tablet view */}
+          <div className="lg:hidden block space-y-3">
+            {/* active additions summary */}
+            {activeAddons.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 p-2 bg-slate-55 bg-slate-100/60 rounded-2xl border border-slate-200/50">
+                {activeAddons.map(key => (
+                  <span 
+                    key={key} 
+                    className="text-[10.5px] font-black bg-[#0F172A] text-white px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm"
+                  >
+                    <Check size={10} className="text-[#FACC15]" />
+                    {ADDONS[key]?.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-xs font-bold text-center py-2 bg-slate-50 rounded-2xl border border-slate-200/40">
+                لا توجد إضافات نشطة لهذا البند.
+              </p>
+            )}
+
+            {/* expand/collapse button */}
+            <button
+              type="button"
+              onClick={() => setIsAddonsOpen(!isAddonsOpen)}
+              className="w-full flex items-center justify-center gap-1.5 bg-[#0F172A] hover:bg-black text-white py-2 px-4 rounded-xl font-black text-xs shadow transition-all duration-200 active:scale-95 cursor-pointer"
+            >
+              <Sliders size={14} className="text-[#FACC15]" />
+              <span>{isAddonsOpen ? 'حفظ وإغلاق قائمة الخيارات' : `تعديل واختيار الإضافات (${activeAddons.length})`}</span>
+              {isAddonsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {/* mobile custom picker sheet */}
+            <AnimatePresence>
+              {isAddonsOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden border border-slate-150 rounded-2xl p-3 bg-slate-50/60 space-y-2 mt-2"
+                >
+                  {Object.entries(ADDONS).map(([key, addon]) => {
+                    const isDoubleGlass = key === 'doubleGlass';
+                    const isColorGlass = key === 'colorGlass';
+                    const isPleated = key === 'pleated';
+                    const isBlackout = key === 'blackout';
+                    const isSkewWindow1 = key === 'skewWindow1';
+                    const isSkewWindow2 = key === 'skewWindow2';
+                    const isSkewBalcony1 = key === 'skewBalcony1';
+                    const isSkewBalcony2 = key === 'skewBalcony2';
+
+                    const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
+                    const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
+                    const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
+
+                    const isDisabled = 
+                      (isDoubleGlass && item.addons.includes('colorGlass')) ||
+                      (isColorGlass && item.addons.includes('doubleGlass')) ||
+                      (isPleated && item.addons.includes('blackout')) ||
+                      (isBlackout && item.addons.includes('pleated')) ||
+                      (isSkewWindow1 && item.addons.includes('skewWindow2')) ||
+                      (isSkewWindow2 && item.addons.includes('skewWindow1')) ||
+                      (isSkewBalcony1 && item.addons.includes('skewBalcony2')) ||
+                      (isSkewBalcony2 && item.addons.includes('skewBalcony1')) ||
+                      (isBalconyAddon && item.itemType !== 'balcony') ||
+                      (isWindowAddon && item.itemType !== 'window') ||
+                      (isDoorForbiddenAddon && item.itemType === 'door');
+
+                    let conflictTag = '';
+                    if (isDoubleGlass && item.addons.includes('colorGlass')) {
+                      conflictTag = ' (تم اختيار ألوان خاصة)';
+                    } else if (isColorGlass && item.addons.includes('doubleGlass')) {
+                      conflictTag = ' (تم اختيار زجاج عادي)';
+                    } else if (isPleated && item.addons.includes('blackout')) {
+                      conflictTag = ' (تم اختيار بلاك أوت)';
+                    } else if (isBlackout && item.addons.includes('pleated')) {
+                      conflictTag = ' (تم اختيار سلك بليسيه)';
+                    } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
+                      conflictTag = ' (تم اختيار ضلفتين)';
+                    } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {
+                      conflictTag = ' (تم اختيار ضلفة واحدة)';
+                    } else if (isSkewBalcony1 && item.addons.includes('skewBalcony2')) {
+                      conflictTag = ' (تم اختيار ضلفتين)';
+                    } else if (isSkewBalcony2 && item.addons.includes('skewBalcony1')) {
+                      conflictTag = ' (تم اختيار ضلفة واحدة)';
+                    } else if (isBalconyAddon && item.itemType !== 'balcony') {
+                      conflictTag = ' (متاح للبلكونات فقط)';
+                    } else if (isWindowAddon && item.itemType !== 'window') {
+                      conflictTag = ' (متاح للشبابيك فقط)';
+                    } else if (isDoorForbiddenAddon && item.itemType === 'door') {
+                      conflictTag = ' (غير متاح للأبواب)';
+                    }
+
+                    const formatAddonPrice = (ad: typeof addon) => {
+                      if (ad.id === 'panda') return 'متر × 1.5';
+                      if (ad.isFlat) {
+                        return `+${ad.price} ج.م`;
+                      }
+                      return `+${ad.price} ج.م/م²`;
+                    };
+
+                    return (
+                      <div 
+                        key={key} 
+                        className={`p-2.5 rounded-xl transition-all duration-200 border-2 ${
+                          item.addons.includes(key)
+                            ? 'bg-[#FDFBF7] border-[#FACC15]'
+                            : 'bg-white border-transparent'
+                        }`}
+                      >
+                        <label 
+                          className={`flex items-start justify-between gap-2.5 ${
+                            isDisabled 
+                              ? 'opacity-40 cursor-not-allowed' 
+                              : 'cursor-pointer group'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={item.addons.includes(key)}
+                              disabled={isDisabled}
+                              onChange={() => !isDisabled && toggleAddon(item.id, key)}
+                              className={`w-5 h-5 mt-0.5 text-[#0F172A] rounded border-slate-300 focus:ring-[#FACC15] ${
+                                isDisabled ? 'cursor-not-allowed text-slate-300' : 'cursor-pointer'
+                              }`}
+                            />
+                            <div className="flex flex-col text-right">
+                              <span className={`text-sm font-black transition-colors duration-200 ${
+                                isDisabled 
+                                  ? 'text-slate-400 line-through' 
+                                  : 'text-slate-800'
+                              }`}>
+                                {addon.name}
+                              </span>
+                              {key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' ? (
+                                <span className="text-[10px] text-slate-400 font-bold">
+                                  نظام المفصلي قلاب
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          
+                          <div className="text-left shrink-0">
+                            <span className="text-[10.5px] font-extrabold font-mono bg-slate-100 text-[#0F172A] px-2 py-0.5 rounded-lg border border-slate-200/60 inline-block">
+                              {formatAddonPrice(addon)}
+                            </span>
+                          </div>
+                        </label>
+                        {isDisabled && (
+                          <div className="text-[10px] text-amber-600 font-extrabold mr-7 mt-0.5">
+                            ⚠️{conflictTag}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
       {/* إجمالي البند */}
       <div className="bg-slate-50 p-5 border-t-2 border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:bg-white print:border-t-2 print:border-slate-800">
-        <div className="text-slate-500 text-sm font-bold">
-          سعر المتر المربع لهذا البند: <span className="font-bold text-slate-800">{formatCurrency(item.profilePrice + item.addonsPrice)}</span>
+        <div className="text-slate-500 text-sm font-bold flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>سعر المتر المربع لهذا البند: <span className="font-bold text-slate-800">{formatCurrency(item.profilePrice + item.addonsPrice)}</span></span>
+          {item.flatAddonsPrice && item.flatAddonsPrice > 0 ? (
+            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 font-extrabold text-xs">
+              + {formatCurrency(item.flatAddonsPrice)} إضافات مقطوعة
+            </span>
+          ) : null}
         </div>
-        <div className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <div className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
           إجمالي البند: 
-          <span className="text-2xl font-black text-[#0F172A] font-display">{formatCurrency(item.itemTotal)}</span>
+          <span className="text-xl sm:text-2xl font-black text-[#0F172A] font-display">{formatCurrency(item.itemTotal)}</span>
         </div>
       </div>
     </motion.div>

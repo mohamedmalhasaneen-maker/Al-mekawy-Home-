@@ -3,11 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface NoteItem {
+  id: string;
+  text: string;
+  amount: number;
+}
+
 export interface CustomerInfo {
   name: string;
   phone: string;
   address: string;
   date: string;
+  discountType?: 'percentage' | 'cash';
+  discountValue?: number;
+  notes?: string;
+  notesAmount?: number;
+  additionalNotes?: NoteItem[];
 }
 
 export interface Profile {
@@ -20,12 +31,14 @@ export interface Addon {
   id: string;
   name: string;
   price: number;
+  isFlat?: boolean;
+  unit?: string;
 }
 
 export interface QuoteItem {
   id: number;
   title: string;
-  itemType: 'window' | 'door';
+  itemType: 'window' | 'door' | 'balcony';
   width: number;
   height: number;
   profile: string;
@@ -39,6 +52,7 @@ export interface CalculatedItem extends QuoteItem {
   itemTotal: number;
   profilePrice: number;
   addonsPrice: number;
+  flatAddonsPrice?: number;
 }
 
 export interface CalculationResult {

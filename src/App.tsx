@@ -27,7 +27,12 @@ export default function App() {
     name: '',
     phone: '',
     address: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    discountType: 'cash',
+    discountValue: 0,
+    notes: '',
+    notesAmount: 0,
+    additionalNotes: []
   });
 
   const [items, setItems] = useState<QuoteItem[]>([
@@ -74,6 +79,29 @@ export default function App() {
       if (item.id === id) {
         let updatedItem = { ...item, [field]: value };
         
+        // Logical constraints when switching item type
+        if (field === 'itemType') {
+          let newAddons = [...item.addons];
+          if (value === 'window') {
+            // Remove balcony items
+            newAddons = newAddons.filter(id => id !== 'skewBalcony1' && id !== 'skewBalcony2');
+          } else if (value === 'balcony') {
+            // Remove window items
+            newAddons = newAddons.filter(id => id !== 'skewWindow1' && id !== 'skewWindow2');
+          } else if (value === 'door') {
+            // Remove tilt-and-turn (skew) additions, double handle, and pombe
+            newAddons = newAddons.filter(id => 
+              id !== 'skewWindow1' && 
+              id !== 'skewWindow2' && 
+              id !== 'skewBalcony1' && 
+              id !== 'skewBalcony2' && 
+              id !== 'doubleHandle' && 
+              id !== 'pombe'
+            );
+          }
+          updatedItem.addons = newAddons;
+        }
+        
         // Logical constraints for add-ons
         if (field === 'addons') {
             const newAddons = [...value];
@@ -91,6 +119,22 @@ export default function App() {
             }
             if (value.includes('colorGlass') && item.addons.indexOf('colorGlass') === -1) {
                  const index = newAddons.indexOf('doubleGlass');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
+            if (value.includes('skewWindow1') && item.addons.indexOf('skewWindow1') === -1) {
+                 const index = newAddons.indexOf('skewWindow2');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
+            if (value.includes('skewWindow2') && item.addons.indexOf('skewWindow2') === -1) {
+                 const index = newAddons.indexOf('skewWindow1');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
+            if (value.includes('skewBalcony1') && item.addons.indexOf('skewBalcony1') === -1) {
+                 const index = newAddons.indexOf('skewBalcony2');
+                 if (index > -1) newAddons.splice(index, 1);
+            }
+            if (value.includes('skewBalcony2') && item.addons.indexOf('skewBalcony2') === -1) {
+                 const index = newAddons.indexOf('skewBalcony1');
                  if (index > -1) newAddons.splice(index, 1);
             }
             updatedItem.addons = newAddons;
@@ -135,21 +179,29 @@ export default function App() {
         profilePrice = profilePrice * 1.5;
       }
       let addonsPrice = 0;
+      let flatAddonsPrice = 0;
       
       item.addons.forEach(id => {
-        addonsPrice += ADDONS[id]?.price || 0;
+        const addon = ADDONS[id];
+        if (addon) {
+          if (addon.isFlat) {
+            flatAddonsPrice += addon.price;
+          } else {
+            addonsPrice += addon.price;
+          }
+        }
       });
 
-      const itemTotal = area * (profilePrice + addonsPrice);
+      const itemTotal = (area * (profilePrice + addonsPrice)) + flatAddonsPrice;
       totalPrice += itemTotal;
 
-      return { ...item, area, itemTotal, profilePrice, addonsPrice };
+      return { ...item, area, itemTotal, profilePrice, addonsPrice, flatAddonsPrice };
     });
 
     return { itemsCalculated, totalArea, totalPrice };
   }, [items]);
 
-  const handleCustomerChange = (field: keyof CustomerInfo, value: string) => {
+  const handleCustomerChange = (field: keyof CustomerInfo, value: any) => {
     setCustomer(prev => ({ ...prev, [field]: value }));
   };
 
@@ -217,6 +269,8 @@ export default function App() {
 
         <SummaryBox 
           calculations={calculations}
+          customer={customer}
+          onChange={handleCustomerChange}
           formatCurrency={formatCurrency}
           handlePrint={handlePrint}
         />

@@ -20,6 +20,26 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
     return `MH-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}-${random}`;
   }, []);
 
+  const { discountType = 'cash', discountValue = 0, notesAmount = 0, notes = '', additionalNotes = [] } = customer;
+
+  const discountAmount = React.useMemo(() => {
+    let amount = 0;
+    if (discountType === 'percentage') {
+      amount = (calculations.totalPrice * discountValue) / 100;
+    } else {
+      amount = discountValue;
+    }
+    return amount > calculations.totalPrice ? calculations.totalPrice : amount;
+  }, [calculations.totalPrice, discountType, discountValue]);
+
+  const totalNotesAmount = React.useMemo(() => {
+    return notesAmount + additionalNotes.reduce((sum, item) => sum + (item.amount || 0), 0);
+  }, [notesAmount, additionalNotes]);
+
+  const finalPrice = React.useMemo(() => {
+    return Math.max(0, calculations.totalPrice - discountAmount + totalNotesAmount);
+  }, [calculations.totalPrice, discountAmount, totalNotesAmount]);
+
   const exportToPdf = async () => {
     if (isExporting) return;
     setIsExporting(true);
@@ -204,7 +224,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                       <div className="font-bold text-slate-900 text-base flex items-center gap-2">
                         {item.title}
                         <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded print:bg-slate-200">
-                          {item.itemType === 'door' ? 'باب' : 'شباك'}
+                          {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
                         </span>
                       </div>
                       <div className="text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
@@ -256,6 +276,11 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                       <div className="text-[11px] text-slate-400 mt-0.5">
                         بمعدل {formatCurrency(item.profilePrice + item.addonsPrice)} / م²
                       </div>
+                      {item.flatAddonsPrice && item.flatAddonsPrice > 0 ? (
+                        <div className="text-[10px] text-emerald-700 font-extrabold mt-0.5 print:text-emerald-800">
+                          + {formatCurrency(item.flatAddonsPrice)} (مقطوع)
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -272,20 +297,98 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               إجمالي المساحة الفعلية للفتحات المحسوبة تبلغ بالامتار المسطحة:
             </p>
           </div>
-          <div className="flex items-center gap-8 shrink-0">
+          <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-4 shrink-0">
             <div className="text-right">
-              <span className="text-xs text-slate-400 uppercase font-black tracking-wider block mb-1">إجمالي الأمتار</span>
+              <span className="text-xs text-slate-400 print:text-slate-500 uppercase font-black tracking-wider block mb-1">إجمالي الأمتار</span>
               <span className="text-2xl font-black font-mono leading-none" dir="ltr">{calculations.totalArea.toFixed(2)} m²</span>
             </div>
-            <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
-            <div className="text-right">
-              <span className="text-xs text-amber-400 print:text-slate-500 uppercase font-black tracking-wider block mb-1">صافي القيمة الكلية</span>
-              <span className="text-3xl sm:text-4xl font-black font-display text-yellow-400 print:text-slate-900 leading-none">
-                {formatCurrency(calculations.totalPrice)}
-              </span>
-            </div>
+            
+            {(discountValue > 0 || totalNotesAmount !== 0) ? (
+              <>
+                <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 print:text-slate-500 uppercase font-black tracking-wider block mb-1">الإجمالي قبل الخصم</span>
+                  <span className="text-lg font-bold font-mono leading-none text-slate-300 print:text-slate-700" dir="ltr">{formatCurrency(calculations.totalPrice)}</span>
+                </div>
+                
+                {discountValue > 0 && (
+                  <>
+                    <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
+                    <div className="text-right">
+                      <span className="text-xs text-emerald-400 print:text-emerald-700 uppercase font-black tracking-wider block mb-1">خصم خاصة</span>
+                      <span className="text-lg font-bold font-mono leading-none text-emerald-300 print:text-emerald-800">- {formatCurrency(discountAmount)}</span>
+                    </div>
+                  </>
+                )}
+
+                {totalNotesAmount !== 0 && (
+                  <>
+                    <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
+                    <div className="text-right">
+                      <span className="text-xs text-blue-400 print:text-blue-700 uppercase font-black tracking-wider block mb-1">إضافات الملاحظات</span>
+                      <span className="text-lg font-bold font-mono leading-none text-blue-300 print:text-blue-700" dir="ltr">
+                        {totalNotesAmount > 0 ? '+' : ''}{formatCurrency(totalNotesAmount)}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
+                <div className="text-right">
+                  <span className="text-xs text-amber-400 print:text-slate-600 uppercase font-black tracking-wider block mb-1">صافي القيمة النهائية</span>
+                  <span className="text-3xl sm:text-4xl font-black font-display text-yellow-400 print:text-slate-900 leading-none">
+                    {formatCurrency(finalPrice)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-[#334155]/50 h-10 w-[2px] print:bg-slate-300" />
+                <div className="text-right">
+                  <span className="text-xs text-amber-400 print:text-slate-500 uppercase font-black tracking-wider block mb-1">صافي القيمة الكلية</span>
+                  <span className="text-3xl sm:text-4xl font-black font-display text-yellow-400 print:text-slate-900 leading-none">
+                    {formatCurrency(calculations.totalPrice)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Custom notes for print */}
+        {(notes || additionalNotes.some(n => n.text)) && (
+          <div className="mt-8 bg-slate-50 border-r-4 border-[#0F172A] p-5 rounded-2xl text-right space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-[#0F172A] flex items-center gap-2">
+              📝 ملاحظات خاصة وتفاصيل إضافية مضافة:
+            </h3>
+            
+            {notes && (
+              <div className="border-b border-slate-100 pb-3 last:border-none last:pb-0">
+                <p className="text-slate-700 text-sm font-bold whitespace-pre-wrap leading-relaxed">
+                  {notes}
+                </p>
+                {notesAmount !== 0 && (
+                  <p className="text-xs font-black text-[#0F172A] mt-2 bg-yellow-50/40 p-1.5 px-3 rounded-lg inline-block border border-yellow-200">
+                    القيمة المقترنة: {notesAmount > 0 ? 'إضافة قدرها ' : 'خصم قدره '} {formatCurrency(Math.abs(notesAmount))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {additionalNotes.map((note, idx) => note.text && (
+              <div key={note.id || idx} className="border-b border-slate-150 pb-3 last:border-none last:pb-0 pt-2 border-t border-dashed border-slate-200">
+                <p className="text-slate-700 text-sm font-bold whitespace-pre-wrap leading-relaxed">
+                  {note.text}
+                </p>
+                {note.amount !== 0 && (
+                  <p className="text-xs font-black text-[#0F172A] mt-2 bg-yellow-50/40 p-1.5 px-3 rounded-lg inline-block border border-yellow-200">
+                    القيمة المقترنة: {note.amount > 0 ? 'إضافة قدرها ' : 'خصم قدره '} {formatCurrency(Math.abs(note.amount))}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Terms and conditions */}
         <div className="mt-10 border-t-2 border-slate-200 pt-8 text-right">
