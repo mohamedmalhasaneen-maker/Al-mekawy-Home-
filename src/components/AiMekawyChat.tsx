@@ -172,7 +172,7 @@ export default function AiMekawyChat() {
                     <span className={`block text-[8px] mt-1.5 text-left opacity-60 ${
                       msg.role === 'user' ? 'text-slate-500' : 'text-slate-300'
                     }`}>
-                      {msg.timestamp.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                      {msg.timestamp.toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 </div>

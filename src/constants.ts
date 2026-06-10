@@ -19,7 +19,8 @@ export const ADDONS: Record<string, Addon> = {
   blackout: { id: 'blackout', name: 'بلاك أوت + سلك بليسيه', price: 1600 },
   doubleGlass: { id: 'doubleGlass', name: 'زجاج دبل جلاس (عادي)', price: 850 },
   colorGlass: { id: 'colorGlass', name: 'زجاج دبل ألوان خاصة', price: 1000 },
-  specialColor: { id: 'specialColor', name: 'ألوان قطاعات خاصة (خشبي - أرو - رمادي - أسود)', price: 1800 }
+  specialColor: { id: 'specialColor', name: 'ألوان قطاعات خاصة (خشبي - أرو - رمادي - أسود)', price: 1800 },
+  panda: { id: 'panda', name: 'نظام باندا (ضلفة على ضلفة)', price: 0 }
 };
 
 export const GLASS_TYPES = [

@@ -15,11 +15,9 @@ import QrModal from './components/QrModal';
 import AiMekawyChat from './components/AiMekawyChat';
 
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('ar-EG', { 
-    style: 'currency', 
-    currency: 'EGP', 
+  return new Intl.NumberFormat('en-US', { 
     maximumFractionDigits: 0 
-  }).format(value);
+  }).format(value) + ' ج.م';
 };
 
 export default function App() {
@@ -131,7 +129,10 @@ export default function App() {
       
       totalArea += area;
 
-      const profilePrice = PROFILES[item.profile]?.price || 0;
+      let profilePrice = PROFILES[item.profile]?.price || 0;
+      if (item.addons.includes('panda')) {
+        profilePrice = profilePrice * 1.5;
+      }
       let addonsPrice = 0;
       
       item.addons.forEach(id => {
