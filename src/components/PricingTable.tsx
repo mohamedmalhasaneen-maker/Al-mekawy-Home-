@@ -1,7 +1,12 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Layers, CheckCircle2, Sliders, ShieldCheck, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
-import { PROFILES, ADDONS } from '../constants';
+import { Profile, Addon } from '../types';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', { 
@@ -9,7 +14,12 @@ const formatCurrency = (value: number) => {
   }).format(value) + ' ج.م';
 };
 
-export default function PricingTable() {
+interface PricingTableProps {
+  profiles: Record<string, Profile>;
+  addons: Record<string, Addon>;
+}
+
+export default function PricingTable({ profiles, addons }: PricingTableProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -70,7 +80,7 @@ export default function PricingTable() {
                 </div>
                 
                 <div className="space-y-3">
-                  {Object.values(PROFILES).map((profile) => (
+                  {Object.values(profiles).map((profile) => (
                     <div 
                       key={profile.id}
                       className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-150 transition-all hover:shadow-md hover:border-[#FACC15]/30"
@@ -88,7 +98,7 @@ export default function PricingTable() {
 
                 <div className="mt-4 flex items-start gap-2 bg-[#0F172A]/5 p-3 rounded-xl border border-[#0F172A]/10">
                   <ShieldCheck size={16} className="text-[#0F172A] shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-550 leading-normal font-bold text-slate-500">
+                  <p className="text-xs leading-normal font-bold text-slate-500">
                     جميع قطاعات الـ UPVC لدينا تتميز بمقاومتها الشديدة للعوامل الجوية والحرارة وعزل تام للصوت والتربة.
                   </p>
                 </div>
@@ -105,7 +115,7 @@ export default function PricingTable() {
                 </div>
 
                 <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-                  {Object.values(ADDONS).map((addon) => (
+                  {Object.values(addons).map((addon) => (
                     <div 
                       key={addon.id}
                       className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-150 transition-all hover:shadow-md hover:border-[#FACC15]/30"

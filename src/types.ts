@@ -14,6 +14,7 @@ export interface CustomerInfo {
   phone: string;
   address: string;
   date: string;
+  deliveryDate?: string;
   discountType?: 'percentage' | 'cash';
   discountValue?: number;
   notes?: string;
@@ -43,7 +44,9 @@ export interface QuoteItem {
   height: number;
   profile: string;
   opening: string;
+  innerType?: 'glass' | 'panel' | 'panel_glass';
   glassType: string;
+  hingePanes?: string;
   addons: string[];
 }
 

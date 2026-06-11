@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Trash2, ChevronDown, ChevronUp, Sliders, Check } from 'lucide-react';
-import { CalculatedItem } from '../types';
-import { PROFILES, ADDONS, GLASS_TYPES, OPENING_TYPES } from '../constants';
+import { CalculatedItem, Profile, Addon } from '../types';
+import { GLASS_TYPES, OPENING_TYPES } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
+import { DynamicPreview } from './DynamicPreview';
 
 interface Props {
   item: CalculatedItem;
@@ -11,13 +12,81 @@ interface Props {
   removeItem: (id: number) => void;
   toggleAddon: (itemId: number, addonId: string) => void;
   formatCurrency: (value: number) => string;
+  profiles: Record<string, Profile>;
+  addons: Record<string, Addon>;
 }
 
-const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggleAddon, formatCurrency }) => {
+const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggleAddon, formatCurrency, profiles, addons }) => {
   const itemNumber = String(index + 1).padStart(2, '0');
   const [isAddonsOpen, setIsAddonsOpen] = useState(false);
 
-  const activeAddons = item.addons.filter(key => ADDONS[key]);
+  const activeAddons = item.addons.filter(key => addons[key]);
+
+  const getAddonStatus = (key: string) => {
+    const isDoubleGlass = key === 'doubleGlass';
+    const isColorGlass = key === 'colorGlass';
+    const isSingleColorGlass = key === 'singleColorGlass';
+    const isPleated = key === 'pleated';
+    const isBlackout = key === 'blackout';
+    const isSkewWindow1 = key === 'skewWindow1';
+    const isSkewWindow2 = key === 'skewWindow2';
+    const isSkewBalcony1 = key === 'skewBalcony1';
+    const isSkewBalcony2 = key === 'skewBalcony2';
+
+    const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
+    const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
+    const isSkewAddon = isBalconyAddon || isWindowAddon;
+    const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
+
+    const isDisabled = 
+      (item.innerType === 'panel' && (isDoubleGlass || isColorGlass || isSingleColorGlass)) ||
+      (isDoubleGlass && (item.addons.includes('colorGlass') || item.addons.includes('singleColorGlass'))) ||
+      (isColorGlass && (item.addons.includes('doubleGlass') || item.addons.includes('singleColorGlass'))) ||
+      (isSingleColorGlass && (item.addons.includes('doubleGlass') || item.addons.includes('colorGlass'))) ||
+      (isPleated && item.addons.includes('blackout')) ||
+      (isBlackout && item.addons.includes('pleated')) ||
+      (isSkewWindow1 && item.addons.includes('skewWindow2')) ||
+      (isSkewWindow2 && item.addons.includes('skewWindow1')) ||
+      (isSkewBalcony1 && item.addons.includes('skewBalcony2')) ||
+      (isSkewBalcony2 && item.addons.includes('skewBalcony1')) ||
+      (isBalconyAddon && item.itemType !== 'balcony') ||
+      (isWindowAddon && item.itemType !== 'window') ||
+      (isDoorForbiddenAddon && item.itemType === 'door') ||
+      (isSkewAddon && item.opening !== 'مفصلي');
+
+    let conflictTag = '';
+    if (item.innerType === 'panel' && (isDoubleGlass || isColorGlass || isSingleColorGlass)) {
+      conflictTag = ' (غير متاح للبند بنل بالكامل)';
+    } else if (isDoubleGlass && (item.addons.includes('colorGlass') || item.addons.includes('singleColorGlass'))) {
+      conflictTag = ' (تعارض مع خيار زجاج آخر)';
+    } else if (isColorGlass && (item.addons.includes('doubleGlass') || item.addons.includes('singleColorGlass'))) {
+      conflictTag = ' (تعارض مع خيار زجاج آخر)';
+    } else if (isSingleColorGlass && (item.addons.includes('doubleGlass') || item.addons.includes('colorGlass'))) {
+      conflictTag = ' (تعارض مع خيار زجاج آخر)';
+    } else if (isPleated && item.addons.includes('blackout')) {
+      conflictTag = ' (تم اختيار بلاك أوت)';
+    } else if (isBlackout && item.addons.includes('pleated')) {
+      conflictTag = ' (تم اختيار سلك بليسيه)';
+    } else if (isSkewAddon && item.opening !== 'مفصلي') {
+      conflictTag = ' (متاح لنظام الفتح المفصلي فقط)';
+    } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
+      conflictTag = ' (تم اختيار ضلفتين)';
+    } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {
+      conflictTag = ' (تم اختيار ضلفة واحدة)';
+    } else if (isSkewBalcony1 && item.addons.includes('skewBalcony2')) {
+      conflictTag = ' (تم اختيار ضلفتين)';
+    } else if (isSkewBalcony2 && item.addons.includes('skewBalcony1')) {
+      conflictTag = ' (تم اختيار ضلفة واحدة)';
+    } else if (isBalconyAddon && item.itemType !== 'balcony') {
+      conflictTag = ' (متاح للبلكونات فقط)';
+    } else if (isWindowAddon && item.itemType !== 'window') {
+      conflictTag = ' (متاح للشبابيك فقط)';
+    } else if (isDoorForbiddenAddon && item.itemType === 'door') {
+      conflictTag = ' (غير متاح للأبواب)';
+    }
+
+    return { isDisabled, conflictTag };
+  };
 
   return (
     <motion.div 
@@ -49,7 +118,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
         </button>
       </div>
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8">
         {/* المقاسات */}
         <div className="space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المقاسات</h3>
@@ -57,23 +126,23 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
             {/* Display side by side on mobile/tablet, vertically stacked on desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               <div>
-                <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العرض (سم)</label>
+                <label className="block text-[10.5px] sm:text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العرض (سم)</label>
                 <input
                   type="number"
                   min="0"
                   value={item.width || ''}
                   onChange={(e) => updateItem(item.id, 'width', e.target.value ? Number(e.target.value) : 0)}
-                  className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center sm:text-right"
+                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center"
                 />
               </div>
               <div>
-                <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">الارتفاع (سم)</label>
+                <label className="block text-[10.5px] sm:text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">الارتفاع (سم)</label>
                 <input
                   type="number"
                   min="0"
                   value={item.height || ''}
                   onChange={(e) => updateItem(item.id, 'height', e.target.value ? Number(e.target.value) : 0)}
-                  className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center sm:text-right"
+                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center"
                 />
               </div>
             </div>
@@ -95,28 +164,28 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
         {/* المواصفات الأساسية */}
         <div className="lg:col-span-2 space-y-4">
           <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المواصفات</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:gap-x-6 sm:gap-y-4">
             <div>
               <label className="block text-xs font-extrabold text-[#64748B] mb-1.5 uppercase tracking-wider">نوع البند</label>
               <div className="flex gap-1 bg-slate-100 p-1 rounded-xl print:hidden">
                 <button
                   type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'window')}
-                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'window' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 px-1.5 text-center rounded-lg font-black text-[10.5px] sm:text-xs transition-all cursor-pointer ${item.itemType === 'window' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   شباك
                 </button>
                 <button
                   type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'balcony')}
-                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'balcony' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 px-1.5 text-center rounded-lg font-black text-[10.5px] sm:text-xs transition-all cursor-pointer ${item.itemType === 'balcony' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   بلكونة
                 </button>
                 <button
                   type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'door')}
-                  className={`flex-1 py-1.5 px-2.5 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 px-1.5 text-center rounded-lg font-black text-[10.5px] sm:text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   باب
                 </button>
@@ -131,9 +200,9 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               <select
                 value={item.profile}
                 onChange={(e) => updateItem(item.id, 'profile', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A] text-xs sm:text-sm"
               >
-                {Object.entries(PROFILES).map(([key, profile]) => (
+                {(Object.entries(profiles) as [string, Profile][]).map(([key, profile]) => (
                   <option key={key} value={key}>{profile.name}</option>
                 ))}
               </select>
@@ -144,7 +213,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               <select
                 value={item.opening}
                 onChange={(e) => updateItem(item.id, 'opening', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A] text-xs sm:text-sm"
               >
                 {OPENING_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -152,19 +221,57 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
+              <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">الجزء الداخلي</label>
+              <select
+                value={item.innerType || 'glass'}
+                onChange={(e) => updateItem(item.id, 'innerType', e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A] text-xs sm:text-sm"
+              >
+                <option value="glass">زجاج</option>
+                <option value="panel">بنل</option>
+                <option value="panel_glass">بنل مع زجاج</option>
+              </select>
+            </div>
+
+            <div className={item.opening === 'مفصلي' ? "col-span-1" : "col-span-2"}>
               <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">نوع الزجاج</label>
               <select
                 value={item.glassType}
+                disabled={item.innerType === 'panel'}
                 onChange={(e) => updateItem(item.id, 'glassType', e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A]"
+                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A] text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
-                {GLASS_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
+                {item.innerType === 'panel' ? (
+                  <option value="بدون زجاج (بنل فقط)">بدون زجاج (بنل فقط)</option>
+                ) : (
+                  GLASS_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))
+                )}
               </select>
             </div>
+
+            {item.opening === 'مفصلي' && (
+              <div className="col-span-1">
+                <label className="block text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">عدد ضلف المفصلي</label>
+                <select
+                  value={item.hingePanes || 'ضلفة'}
+                  onChange={(e) => updateItem(item.id, 'hingePanes', e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:appearance-none print:border-none print:p-0 print:font-bold cursor-pointer font-bold text-[#0F172A] text-xs sm:text-sm"
+                >
+                  <option value="ضلفة">ضلفة</option>
+                  <option value="ضلفتين">ضلفتين</option>
+                </select>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* رسم المعاينة التفاعلي */}
+        <div className="sm:col-span-2 lg:col-span-1 flex flex-col space-y-4">
+          <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">رسم المعاينة</h3>
+          <DynamicPreview item={item} />
         </div>
 
         {/* الإضافات - Responsive & Mobile-friendly collapsible design */}
@@ -176,57 +283,8 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
 
           {/* Desktop-only view of all addons always expanded */}
           <div className="hidden lg:grid grid-cols-1 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
-            {Object.entries(ADDONS).map(([key, addon]) => {
-              const isDoubleGlass = key === 'doubleGlass';
-              const isColorGlass = key === 'colorGlass';
-              const isPleated = key === 'pleated';
-              const isBlackout = key === 'blackout';
-              const isSkewWindow1 = key === 'skewWindow1';
-              const isSkewWindow2 = key === 'skewWindow2';
-              const isSkewBalcony1 = key === 'skewBalcony1';
-              const isSkewBalcony2 = key === 'skewBalcony2';
-
-              const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
-              const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
-              const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
-
-              const isDisabled = 
-                (isDoubleGlass && item.addons.includes('colorGlass')) ||
-                (isColorGlass && item.addons.includes('doubleGlass')) ||
-                (isPleated && item.addons.includes('blackout')) ||
-                (isBlackout && item.addons.includes('pleated')) ||
-                (isSkewWindow1 && item.addons.includes('skewWindow2')) ||
-                (isSkewWindow2 && item.addons.includes('skewWindow1')) ||
-                (isSkewBalcony1 && item.addons.includes('skewBalcony2')) ||
-                (isSkewBalcony2 && item.addons.includes('skewBalcony1')) ||
-                (isBalconyAddon && item.itemType !== 'balcony') ||
-                (isWindowAddon && item.itemType !== 'window') ||
-                (isDoorForbiddenAddon && item.itemType === 'door');
-
-              let conflictTag = '';
-              if (isDoubleGlass && item.addons.includes('colorGlass')) {
-                conflictTag = ' (تم اختيار ألوان خاصة)';
-              } else if (isColorGlass && item.addons.includes('doubleGlass')) {
-                conflictTag = ' (تم اختيار زجاج عادي)';
-              } else if (isPleated && item.addons.includes('blackout')) {
-                conflictTag = ' (تم اختيار بلاك أوت)';
-              } else if (isBlackout && item.addons.includes('pleated')) {
-                conflictTag = ' (تم اختيار سلك بليسيه)';
-              } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
-                conflictTag = ' (تم اختيار ضلفتين)';
-              } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {
-                conflictTag = ' (تم اختيار ضلفة واحدة)';
-              } else if (isSkewBalcony1 && item.addons.includes('skewBalcony2')) {
-                conflictTag = ' (تم اختيار ضلفتين)';
-              } else if (isSkewBalcony2 && item.addons.includes('skewBalcony1')) {
-                conflictTag = ' (تم اختيار ضلفة واحدة)';
-              } else if (isBalconyAddon && item.itemType !== 'balcony') {
-                conflictTag = ' (متاح للبلكونات فقط)';
-              } else if (isWindowAddon && item.itemType !== 'window') {
-                conflictTag = ' (متاح للشبابيك فقط)';
-              } else if (isDoorForbiddenAddon && item.itemType === 'door') {
-                conflictTag = ' (غير متاح للأبواب)';
-              }
+            {(Object.entries(addons) as [string, Addon][]).map(([key, addon]) => {
+              const { isDisabled, conflictTag } = getAddonStatus(key);
 
               const formatAddonPrice = (ad: typeof addon) => {
                 if (ad.id === 'panda') return 'متر × 1.5';
@@ -305,7 +363,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                     className="text-[10.5px] font-black bg-[#0F172A] text-white px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm"
                   >
                     <Check size={10} className="text-[#FACC15]" />
-                    {ADDONS[key]?.name}
+                    {((addons[key] as any) || {}).name}
                   </span>
                 ))}
               </div>
@@ -335,57 +393,8 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden border border-slate-150 rounded-2xl p-3 bg-slate-50/60 space-y-2 mt-2"
                 >
-                  {Object.entries(ADDONS).map(([key, addon]) => {
-                    const isDoubleGlass = key === 'doubleGlass';
-                    const isColorGlass = key === 'colorGlass';
-                    const isPleated = key === 'pleated';
-                    const isBlackout = key === 'blackout';
-                    const isSkewWindow1 = key === 'skewWindow1';
-                    const isSkewWindow2 = key === 'skewWindow2';
-                    const isSkewBalcony1 = key === 'skewBalcony1';
-                    const isSkewBalcony2 = key === 'skewBalcony2';
-
-                    const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
-                    const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
-                    const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
-
-                    const isDisabled = 
-                      (isDoubleGlass && item.addons.includes('colorGlass')) ||
-                      (isColorGlass && item.addons.includes('doubleGlass')) ||
-                      (isPleated && item.addons.includes('blackout')) ||
-                      (isBlackout && item.addons.includes('pleated')) ||
-                      (isSkewWindow1 && item.addons.includes('skewWindow2')) ||
-                      (isSkewWindow2 && item.addons.includes('skewWindow1')) ||
-                      (isSkewBalcony1 && item.addons.includes('skewBalcony2')) ||
-                      (isSkewBalcony2 && item.addons.includes('skewBalcony1')) ||
-                      (isBalconyAddon && item.itemType !== 'balcony') ||
-                      (isWindowAddon && item.itemType !== 'window') ||
-                      (isDoorForbiddenAddon && item.itemType === 'door');
-
-                    let conflictTag = '';
-                    if (isDoubleGlass && item.addons.includes('colorGlass')) {
-                      conflictTag = ' (تم اختيار ألوان خاصة)';
-                    } else if (isColorGlass && item.addons.includes('doubleGlass')) {
-                      conflictTag = ' (تم اختيار زجاج عادي)';
-                    } else if (isPleated && item.addons.includes('blackout')) {
-                      conflictTag = ' (تم اختيار بلاك أوت)';
-                    } else if (isBlackout && item.addons.includes('pleated')) {
-                      conflictTag = ' (تم اختيار سلك بليسيه)';
-                    } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
-                      conflictTag = ' (تم اختيار ضلفتين)';
-                    } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {
-                      conflictTag = ' (تم اختيار ضلفة واحدة)';
-                    } else if (isSkewBalcony1 && item.addons.includes('skewBalcony2')) {
-                      conflictTag = ' (تم اختيار ضلفتين)';
-                    } else if (isSkewBalcony2 && item.addons.includes('skewBalcony1')) {
-                      conflictTag = ' (تم اختيار ضلفة واحدة)';
-                    } else if (isBalconyAddon && item.itemType !== 'balcony') {
-                      conflictTag = ' (متاح للبلكونات فقط)';
-                    } else if (isWindowAddon && item.itemType !== 'window') {
-                      conflictTag = ' (متاح للشبابيك فقط)';
-                    } else if (isDoorForbiddenAddon && item.itemType === 'door') {
-                      conflictTag = ' (غير متاح للأبواب)';
-                    }
+                  {(Object.entries(addons) as [string, Addon][]).map(([key, addon]) => {
+                    const { isDisabled, conflictTag } = getAddonStatus(key);
 
                     const formatAddonPrice = (ad: typeof addon) => {
                       if (ad.id === 'panda') return 'متر × 1.5';

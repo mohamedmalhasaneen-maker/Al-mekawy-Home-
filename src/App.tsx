@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { Plus, Calculator, QrCode, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { QuoteItem, CalculationResult, CustomerInfo } from './types';
+import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon } from './types';
 import { PROFILES, ADDONS } from './constants';
+import { DevSettingsModal } from './components/DevSettingsModal';
 
 import Header from './components/Header';
 import ItemCard from './components/ItemCard';
@@ -23,11 +24,68 @@ const formatCurrency = (value: number) => {
 
 export default function App() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isDevModalOpen, setIsDevModalOpen] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<'input' | 'quote'>('input');
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('almekawy_theme');
+      return saved === 'dark' ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  });
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    try {
+      localStorage.setItem('almekawy_theme', newTheme);
+    } catch (e) {}
+  };
+
+  const [profiles, setProfiles] = useState<Record<string, Profile>>(() => {
+    try {
+      const saved = localStorage.getItem('almekawy_custom_profiles');
+      return saved ? JSON.parse(saved) : PROFILES;
+    } catch (e) {
+      return PROFILES;
+    }
+  });
+
+  const [addons, setAddons] = useState<Record<string, Addon>>(() => {
+    try {
+      const saved = localStorage.getItem('almekawy_custom_addons');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...ADDONS, ...parsed };
+      }
+      return ADDONS;
+    } catch (e) {
+      return ADDONS;
+    }
+  });
+
+  const handleSavePrices = (updatedProfiles: Record<string, Profile>, updatedAddons: Record<string, Addon>) => {
+    setProfiles(updatedProfiles);
+    setAddons(updatedAddons);
+    localStorage.setItem('almekawy_custom_profiles', JSON.stringify(updatedProfiles));
+    localStorage.setItem('almekawy_custom_addons', JSON.stringify(updatedAddons));
+  };
+
+  const handleResetPrices = () => {
+    setProfiles(PROFILES);
+    setAddons(ADDONS);
+    localStorage.removeItem('almekawy_custom_profiles');
+    localStorage.removeItem('almekawy_custom_addons');
+  };
+
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: '',
     phone: '',
     address: '',
     date: new Date().toISOString().split('T')[0],
+    deliveryDate: '',
     discountType: 'cash',
     discountValue: 0,
     notes: '',
@@ -44,12 +102,14 @@ export default function App() {
       height: 120,
       profile: 'newline',
       opening: 'جرار',
+      innerType: 'glass',
       glassType: 'أبيض شفاف',
       addons: []
     }
   ]);
 
   const addNewItem = () => {
+    setActiveMainTab('input');
     setItems([
       ...items,
       {
@@ -60,6 +120,7 @@ export default function App() {
         height: 100,
         profile: 'newline',
         opening: 'جرار',
+        innerType: 'glass',
         glassType: 'أبيض شفاف',
         addons: []
       }
@@ -100,6 +161,27 @@ export default function App() {
             );
           }
           updatedItem.addons = newAddons;
+        }
+
+        // Logical constraints when switching opening mechanism
+        if (field === 'opening' && value !== 'مفصلي') {
+          updatedItem.addons = item.addons.filter(id => 
+            id !== 'skewWindow1' && 
+            id !== 'skewWindow2' && 
+            id !== 'skewBalcony1' && 
+            id !== 'skewBalcony2'
+          );
+        }
+
+        // Logical constraints for innerType (Panel vs Glass)
+        if (field === 'innerType') {
+          if (value === 'panel') {
+            // Remove glass-related addons when Panel Only is selected
+            updatedItem.addons = item.addons.filter(id => id !== 'doubleGlass' && id !== 'colorGlass');
+            updatedItem.glassType = 'بدون زجاج (بنل فقط)';
+          } else if ((value === 'glass' || value === 'panel_glass') && item.glassType === 'بدون زجاج (بنل فقط)') {
+            updatedItem.glassType = 'أبيض شفاف';
+          }
         }
         
         // Logical constraints for add-ons
@@ -174,7 +256,7 @@ export default function App() {
       
       totalArea += area;
 
-      let profilePrice = PROFILES[item.profile]?.price || 0;
+      let profilePrice = profiles[item.profile]?.price || 0;
       if (item.addons.includes('panda')) {
         profilePrice = profilePrice * 1.5;
       }
@@ -182,7 +264,7 @@ export default function App() {
       let flatAddonsPrice = 0;
       
       item.addons.forEach(id => {
-        const addon = ADDONS[id];
+        const addon = addons[id];
         if (addon) {
           if (addon.isFlat) {
             flatAddonsPrice += addon.price;
@@ -199,26 +281,33 @@ export default function App() {
     });
 
     return { itemsCalculated, totalArea, totalPrice };
-  }, [items]);
+  }, [items, profiles, addons]);
 
   const handleCustomerChange = (field: keyof CustomerInfo, value: any) => {
     setCustomer(prev => ({ ...prev, [field]: value }));
   };
 
   const handlePrint = () => {
-    const el = document.getElementById('detailed-quote-view');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-      el.classList.add('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
-      setTimeout(() => {
-        el.classList.remove('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
-      }, 1500);
-    }
+    setActiveMainTab('quote');
+    setTimeout(() => {
+      const el = document.getElementById('detailed-quote-view');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+        el.classList.add('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
+        }, 1500);
+      }
+    }, 150);
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-105 selection:bg-yellow-200 selection:text-[#0F172A] pb-24 md:pb-0" dir="rtl">
-      <Header />
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark-mode' : ''} bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-105 selection:bg-yellow-200 selection:text-[#0F172A] pb-24 md:pb-0 transition-colors duration-300`} dir="rtl">
+      <Header 
+        onOpenDevSettings={() => setIsDevModalOpen(true)} 
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
 
       <main className="max-w-5xl mx-auto px-4 py-12">
         <motion.div 
@@ -235,51 +324,85 @@ export default function App() {
           </p>
         </motion.div>
 
-        <PricingTable />
-
-        <CustomerForm customer={customer} onChange={handleCustomerChange} />
-
-        <div className="space-y-8 print:hidden">
-          <AnimatePresence mode="popLayout" initial={false}>
-            {calculations.itemsCalculated.map((item, index) => (
-              <ItemCard 
-                key={item.id}
-                item={item}
-                index={index}
-                updateItem={updateItem}
-                removeItem={removeItem}
-                toggleAddon={toggleAddon}
-                formatCurrency={formatCurrency}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-
-        <div className="mt-10 flex justify-center print:hidden">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={addNewItem}
-            className="hidden md:flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
+        {/* Navigation Tabs for adjacent pages view */}
+        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-8 max-w-xl mx-auto border border-slate-200/80 print:hidden shadow-inner relative justify-between gap-1.5">
+          <button
+            onClick={() => setActiveMainTab('input')}
+            className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
+              activeMainTab === 'input'
+                ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
+                : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
+            }`}
           >
-            <Plus size={28} />
-            إضافة بند جديد (شباك / باب)
-          </motion.button>
+            <Calculator size={18} />
+            <span>بيانات العميل وحساب البنود</span>
+          </button>
+          <button
+            onClick={() => setActiveMainTab('quote')}
+            className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
+              activeMainTab === 'quote'
+                ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
+                : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
+            }`}
+          >
+            <FileText size={18} />
+            <span>عرض السعر التفصيلي (PDF)</span>
+          </button>
         </div>
 
-        <SummaryBox 
-          calculations={calculations}
-          customer={customer}
-          onChange={handleCustomerChange}
-          formatCurrency={formatCurrency}
-          handlePrint={handlePrint}
-        />
+        <div className={activeMainTab === 'input' ? 'block' : 'hidden print:hidden'}>
+          <PricingTable profiles={profiles} addons={addons} />
 
-        <DetailedQuoteView 
-          customer={customer}
-          calculations={calculations}
-          formatCurrency={formatCurrency}
-        />
+          <CustomerForm customer={customer} onChange={handleCustomerChange} />
+
+          <div className="space-y-8 print:hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {calculations.itemsCalculated.map((item, index) => (
+                <ItemCard 
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  updateItem={updateItem}
+                  removeItem={removeItem}
+                  toggleAddon={toggleAddon}
+                  formatCurrency={formatCurrency}
+                  profiles={profiles}
+                  addons={addons}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+
+          <div className="mt-10 flex justify-center print:hidden">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={addNewItem}
+              className="hidden md:flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
+            >
+              <Plus size={28} />
+              إضافة بند جديد (شباك / باب)
+            </motion.button>
+          </div>
+
+          <SummaryBox 
+            calculations={calculations}
+            customer={customer}
+            onChange={handleCustomerChange}
+            formatCurrency={formatCurrency}
+            handlePrint={handlePrint}
+          />
+        </div>
+
+        <div className={activeMainTab === 'quote' ? 'block' : 'hidden print:block'}>
+          <DetailedQuoteView 
+            customer={customer}
+            calculations={calculations}
+            formatCurrency={formatCurrency}
+            profiles={profiles}
+            addons={addons}
+          />
+        </div>
 
         <div className="print:hidden">
           <Features />
@@ -309,6 +432,19 @@ export default function App() {
         <AnimatePresence>
           {isQrModalOpen && (
             <QrModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isDevModalOpen && (
+            <DevSettingsModal
+              isOpen={isDevModalOpen}
+              onClose={() => setIsDevModalOpen(false)}
+              profiles={profiles}
+              addons={addons}
+              onSavePrices={handleSavePrices}
+              onResetPrices={handleResetPrices}
+            />
           )}
         </AnimatePresence>
 

@@ -31,7 +31,7 @@ export default function CustomerForm({ customer, onChange }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <div>
           <label className="block text-xs font-extrabold text-slate-500 mb-2 uppercase tracking-wider flex items-center gap-1.5">
             <User size={13} className="text-slate-400" />
@@ -84,6 +84,19 @@ export default function CustomerForm({ customer, onChange }: Props) {
             type="date"
             value={customer.date}
             onChange={(e) => onChange('date', e.target.value)}
+            className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all font-bold cursor-pointer"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-extrabold text-slate-500 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+            <Calendar size={13} className="text-slate-400" />
+            أقصى تاريخ للتسليم
+          </label>
+          <input
+            type="date"
+            value={customer.deliveryDate || ''}
+            onChange={(e) => onChange('deliveryDate', e.target.value)}
             className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all font-bold cursor-pointer"
           />
         </div>

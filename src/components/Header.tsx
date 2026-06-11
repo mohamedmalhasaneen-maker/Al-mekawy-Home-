@@ -1,4 +1,4 @@
-import { Phone, MessageCircle, Facebook, Instagram } from 'lucide-react';
+import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -14,7 +14,13 @@ const TikTokIcon = ({ className = '', size = 14 }: { className?: string, size?: 
   </svg>
 );
 
-export default function Header() {
+interface HeaderProps {
+  onOpenDevSettings: () => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+}
+
+export default function Header({ onOpenDevSettings, theme, onToggleTheme }: HeaderProps) {
   return (
     <header className="bg-[#0F172A] text-white py-6 border-b-4 border-[#FACC15] shadow-lg print:hidden">
       <div className="max-w-5xl mx-auto px-4 flex flex-col gap-6 text-right">
@@ -45,6 +51,37 @@ export default function Header() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto text-right justify-start lg:justify-end"
           >
+            {/* Theme Toggle Button */}
+            <button
+              onClick={onToggleTheme}
+              className="bg-slate-800 hover:bg-slate-700 border border-slate-700/50 hover:border-slate-600 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md select-none"
+              title={theme === 'dark' ? "تفعيل الوضع المضيء" : "تفعيل الوضع الداكن"}
+              type="button"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun size={14} className="text-[#FACC15]" />
+                  <span>الوضع المضيء</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={14} className="text-[#94A3B8]" />
+                  <span>الوضع الداكن</span>
+                </>
+              )}
+            </button>
+
+            {/* Developer Settings Trigger Button */}
+            <button
+              type="button"
+              onClick={onOpenDevSettings}
+              className="bg-[#FACC15] hover:bg-[#E2B90F] text-[#0F172A] font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-amber-955/20 group/btn"
+              title="تعديل جدول الأسعار الأساسية للمصنع"
+            >
+              <Settings size={14} className="text-[#0F172A] group-hover/btn:rotate-90 transition-transform duration-300" />
+              <span>إعدادات المطور</span>
+            </button>
+
             {/* Phones */}
             <div className="flex gap-2">
               <a 

@@ -27,12 +27,13 @@ export const ADDONS: Record<string, Addon> = {
   skewWindow1: { id: 'skewWindow1', name: 'مفصلي قلاب شبابيك (ضلفة واحدة)', price: 700, isFlat: true, unit: 'للضلفة' },
   skewWindow2: { id: 'skewWindow2', name: 'مفصلي قلاب شبابيك (ضلفتين)', price: 1400, isFlat: true, unit: 'للضلفتين' },
   skewBalcony1: { id: 'skewBalcony1', name: 'مفصلي قلاب بلكونات (ضلفة واحدة)', price: 850, isFlat: true, unit: 'للضلفة' },
-  skewBalcony2: { id: 'skewBalcony2', name: 'مفصلي قلاب بلكونات (ضلفتين)', price: 1400, isFlat: true, unit: 'للضلفتين' }
+  skewBalcony2: { id: 'skewBalcony2', name: 'مفصلي قلاب بلكونات (ضلفتين)', price: 1400, isFlat: true, unit: 'للضلفتين' },
+  singleColorGlass: { id: 'singleColorGlass', name: 'زجاج سنجل ألوان خاصة', price: 200 }
 };
 
 export const GLASS_TYPES = [
   'أبيض شفاف', 'مصنفر', 'بني عاكس', 'أبيض عاكس', 'بني سن دبوس',
-  'أزرق عاكس', 'أخضر عاكس', 'أسود عاكس', 'مع جورجيا'
+  'أزرق عاكس', 'أخضر عاكس', 'أسود عاكس'
 ];
 
 export const OPENING_TYPES = [

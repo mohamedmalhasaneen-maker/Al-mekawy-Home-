@@ -1,6 +1,5 @@
 import React from 'react';
-import { CustomerInfo, CalculatedItem, CalculationResult } from '../types';
-import { PROFILES, ADDONS } from '../constants';
+import { CustomerInfo, CalculatedItem, CalculationResult, Profile, Addon } from '../types';
 import { Shield, Medal, Award, Globe, Phone, FileText, CheckCircle, ExternalLink, ThumbsUp, Instagram, Facebook, Download, MessageCircle } from 'lucide-react';
 import jspdf from 'jspdf';
 import * as htmlToImage from 'html-to-image';
@@ -10,9 +9,186 @@ interface Props {
   customer: CustomerInfo;
   calculations: CalculationResult;
   formatCurrency: (value: number) => string;
+  profiles: Record<string, Profile>;
+  addons: Record<string, Addon>;
 }
 
-export default function DetailedQuoteView({ customer, calculations, formatCurrency }: Props) {
+function MiniItemPreview({ item }: { item: CalculatedItem }) {
+  const width = item.width || 100;
+  const height = item.height || 100;
+  const aspect = width / height;
+  const clampedAspect = Math.max(0.5, Math.min(2.0, aspect));
+
+  let svgWidth = 46;
+  let svgHeight = 46;
+  if (clampedAspect > 1) {
+    svgHeight = Math.round(46 / clampedAspect);
+    svgWidth = 46;
+  } else {
+    svgWidth = Math.round(46 * clampedAspect);
+    svgHeight = 46;
+  }
+
+  const isDoor = item.itemType === 'door';
+  const opening = item.opening;
+  const innerType = item.innerType || 'glass';
+  const hasSpecialColor = item.addons.includes('specialColor');
+
+  // Colors
+  const frameOuterColor = hasSpecialColor ? '#334155' : '#E2E8F0';
+  const frameInnerColor = hasSpecialColor ? '#1E293B' : '#F1F5F9';
+  const frameStrokeColor = hasSpecialColor ? '#0F172A' : '#94A3B8';
+
+  let glassFill = 'rgba(224, 242, 254, 0.5)';
+  switch (item.glassType) {
+    case 'مصنفر':
+      glassFill = 'rgba(241, 245, 249, 0.8)';
+      break;
+    case 'بني عاكس':
+      glassFill = 'rgba(180, 83, 9, 0.45)';
+      break;
+    case 'أبيض عاكس':
+      glassFill = 'rgba(219, 234, 254, 0.6)';
+      break;
+    case 'أزرق عاكس':
+      glassFill = 'rgba(29, 78, 216, 0.45)';
+      break;
+    case 'أخضر عاكس':
+      glassFill = 'rgba(4, 120, 87, 0.45)';
+      break;
+    case 'أسود عاكس':
+      glassFill = 'rgba(15, 23, 42, 0.7)';
+      break;
+    default:
+      glassFill = 'rgba(186, 230, 253, 0.4)';
+  }
+
+  const pSize = 3; 
+  const margin = 2;
+  const drawW = svgWidth - margin * 2;
+  const drawH = svgHeight - margin * 2;
+
+  const renderContent = () => {
+    const paneX = margin + pSize;
+    const paneY = margin + pSize;
+    const paneW = drawW - pSize * 2;
+    const paneH = drawH - pSize * 2;
+
+    if (isDoor) {
+      if (innerType === 'panel') {
+        return (
+          <g>
+            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+            {Array.from({ length: 6 }).map((_, i) => {
+              const ly = paneY + (paneH / 7) * (i + 1);
+              return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+            })}
+          </g>
+        );
+      } else if (innerType === 'panel_glass') {
+        const splitY = paneY + paneH * 0.45;
+        return (
+          <g>
+            <rect x={paneX} y={paneY} width={paneW} height={splitY - paneY} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+            <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${splitY - 1} Z`} fill="rgba(255,255,255,0.15)" />
+            <rect x={paneX - 0.5} y={splitY} width={paneW + 1} height="2.5" fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+            <rect x={paneX} y={splitY + 2.5} width={paneW} height={paneH - (splitY - paneY) - 2.5} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+            {Array.from({ length: 3 }).map((_, i) => {
+              const ly = (splitY + 2.5) + ((paneH - (splitY - paneY) - 2.5) / 4) * (i + 1);
+              return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+            })}
+          </g>
+        );
+      } else {
+        return (
+          <g>
+            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+            <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+          </g>
+        );
+      }
+    }
+
+    if (innerType === 'panel') {
+      return (
+        <g>
+          <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+          {Array.from({ length: 4 }).map((_, i) => {
+            const ly = paneY + (paneH / 5) * (i + 1);
+            return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+          })}
+        </g>
+      );
+    }
+
+    if (opening === 'جرار') {
+      const midX = paneX + paneW / 2;
+      return (
+        <g>
+          <rect x={paneX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+          <rect x={midX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+          <rect x={paneX + 1} y={paneY + 1} width={paneW / 2 - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1" />
+          <rect x={midX + 1} y={paneY + 1} width={paneW / 2 - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1" />
+          <path d={`M ${paneX + 2} ${paneY + paneH / 2} L ${paneX + 5} ${paneY + paneH / 2}`} stroke="#475569" strokeWidth="0.5" />
+          <path d={`M ${midX + paneW / 2 - 2} ${paneY + paneH / 2} L ${midX + paneW / 2 - 5} ${paneY + paneH / 2}`} stroke="#475569" strokeWidth="0.5" />
+        </g>
+      );
+    } else if (opening === 'مفصلي') {
+      const isSkew2 = item.addons.includes('skewWindow2') || item.addons.includes('skewBalcony2') || item.hingePanes === 'ضلفتين';
+      if (isSkew2) {
+        const midX = paneX + paneW / 2;
+        return (
+          <g>
+            <rect x={paneX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+            <rect x={midX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+            <rect x={paneX + 1} y={paneY + 1} width={paneW / 2 - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1" />
+            <rect x={midX + 1} y={paneY + 1} width={paneW / 2 - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1" />
+            <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+              <polyline points={`${midX - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${midX - 1},${paneY + paneH - 1}`} />
+              <polyline points={`${midX + 1},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH / 2} ${midX + 1},${paneY + paneH - 1}`} />
+            </g>
+          </g>
+        );
+      } else {
+        return (
+          <g>
+            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+            <rect x={paneX + 1} y={paneY + 1} width={paneW - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1.2" />
+            <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+              <polyline points={`${paneX + paneW - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
+            </g>
+          </g>
+        );
+      }
+    } else if (opening === 'قلاب') {
+      return (
+        <g>
+          <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+          <rect x={paneX + 1} y={paneY + 1} width={paneW - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1.2" />
+          <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+            <polyline points={`${paneX + 1},${paneY + paneH - 1} ${paneX + paneW / 2},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
+          </g>
+        </g>
+      );
+    } else {
+      return (
+        <g>
+          <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
+          <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+        </g>
+      );
+    }
+  };
+
+  return (
+    <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="mx-auto block" xmlns="http://www.w3.org/2000/svg">
+      <rect x={margin} y={margin} width={drawW} height={drawH} fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="1" rx="1.5" />
+      {renderContent()}
+    </svg>
+  );
+}
+
+export default function DetailedQuoteView({ customer, calculations, formatCurrency, profiles, addons }: Props) {
   const [isExporting, setIsExporting] = React.useState(false);
   const quoteNumber = React.useMemo(() => {
     const today = new Date();
@@ -96,7 +272,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
   };
 
   return (
-    <div id="detailed-quote-view" className="mt-16 bg-white border-2 border-slate-300 rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none">
+    <div id="detailed-quote-view" className="mt-16 bg-white border-2 border-slate-300 rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none print:mt-0 print:p-0">
       
       {/* Visual Indicator of Quotation Form */}
       <div className="bg-[#0F172A] text-white p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b-4 border-[#FACC15] print:hidden">
@@ -137,7 +313,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
       <div className="p-6 sm:p-10 bg-white text-slate-900 print:p-0" id="quotation-print-sheet">
         
         {/* Document Header (For print as well) */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-stretch gap-6 pb-8 border-b-4 border-slate-900">
+        <div className="flex flex-col sm:flex-row print:flex-row justify-between items-start sm:items-stretch print:items-stretch gap-6 pb-8 border-b-4 border-slate-900">
           <div className="flex items-center gap-4 text-right">
             <img 
               src={logoUrl} 
@@ -168,7 +344,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
           </div>
 
           {/* Customer Metadata Card */}
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:min-w-[350px] space-y-3 text-right flex-none print:bg-slate-50 print:border-slate-300">
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:min-w-[350px] print:min-w-[320px] print:flex-shrink-0 space-y-3 text-right flex-none print:bg-slate-50 print:border-slate-300">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">بيانات العميل المحترم</h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-start justify-between gap-4">
@@ -183,6 +359,12 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                 <span className="text-slate-500 shrink-0 font-bold">موقع التركيب:</span>
                 <span className="font-bold text-slate-900">{customer.address || "بناءً على مقاسات العميل"}</span>
               </div>
+              {customer.deliveryDate && (
+                <div className="flex items-start justify-between gap-4 border-t border-dashed border-slate-200 pt-1.5 mt-1.5">
+                  <span className="text-slate-500 shrink-0 font-bold">أقصى تاريخ للتسليم:</span>
+                  <span className="font-black text-[#0F172A] font-mono" dir="ltr">{customer.deliveryDate}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -219,15 +401,22 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                       {String(idx + 1).padStart(2, '0')}
                     </td>
                     
-                    {/* Title */}
+                    {/* Title & Preview Drawing */}
                     <td className="py-4 px-4 border-l border-slate-100">
-                      <div className="font-bold text-slate-900 text-base flex items-center gap-2">
-                        {item.title}
-                        <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded print:bg-slate-200">
-                          {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
-                        </span>
+                      <div className="flex items-center justify-between gap-4 min-w-[200px]">
+                        <div className="text-right">
+                          <div className="font-bold text-slate-900 text-base flex items-center gap-2">
+                            {item.title}
+                            <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded print:bg-slate-200">
+                              {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
+                        </div>
+                        <div className="shrink-0 w-[54px] h-[54px] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-0.5 shadow-sm print:bg-white print:border-slate-300">
+                          <MiniItemPreview item={item} />
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
                     </td>
 
                     {/* Width x Height */}
@@ -245,12 +434,20 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                       )}
                     </td>
 
-                    {/* Specs & glass */}
+                     {/* Specs & glass */}
                     <td className="py-4 px-4 border-l border-slate-100">
                       <div className="font-medium text-slate-800">
-                        {PROFILES[item.profile]?.name || item.profile}
+                        {profiles[item.profile]?.name || item.profile}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">الزجاج: {item.glassType}</div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        الجزء الداخلي: {item.innerType === 'panel' ? 'بنل بالكامل' : item.innerType === 'panel_glass' ? 'بنل مع زجاج' : 'زجاج بالكامل'}
+                      </div>
+                      {item.innerType !== 'panel' && (
+                        <div className="text-xs text-slate-400">الزجاج: {item.glassType}</div>
+                      )}
+                      {item.opening === 'مفصلي' && (
+                        <div className="text-xs text-slate-500 font-bold mt-0.5">عدد الضلف: {item.hingePanes || 'ضلفة'}</div>
+                      )}
                     </td>
 
                     {/* Addons list */}
@@ -259,7 +456,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                         <div className="flex flex-col gap-0.5">
                           {item.addons.map(addonId => (
                             <span key={addonId} className="inline-flex items-center gap-1 font-bold text-slate-700">
-                              • {ADDONS[addonId]?.name || addonId}
+                              • {addons[addonId]?.name || addonId}
                             </span>
                           ))}
                         </div>
@@ -290,7 +487,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
 
         {/* Grand Total Area and Calculations */}
-        <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-center gap-6 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-slate-800">
+        <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row print:flex-row justify-between items-center print:items-center print:justify-between gap-6 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-slate-800 print:break-inside-avoid">
           <div className="text-right">
             <h4 className="font-display font-black text-xl mb-1 text-white print:text-[#0F172A]">مجموع مسطحات الأعمال</h4>
             <p className="text-slate-400 text-sm print:text-slate-500">
@@ -357,7 +554,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
 
         {/* Custom notes for print */}
         {(notes || additionalNotes.some(n => n.text)) && (
-          <div className="mt-8 bg-slate-50 border-r-4 border-[#0F172A] p-5 rounded-2xl text-right space-y-4">
+          <div className="mt-8 bg-slate-50 border-r-4 border-[#0F172A] p-5 rounded-2xl text-right space-y-4 print:break-inside-avoid">
             <h3 className="text-xs font-black uppercase tracking-widest text-[#0F172A] flex items-center gap-2">
               📝 ملاحظات خاصة وتفاصيل إضافية مضافة:
             </h3>
@@ -391,10 +588,10 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         )}
 
         {/* Terms and conditions */}
-        <div className="mt-10 border-t-2 border-slate-200 pt-8 text-right">
+        <div className="mt-10 border-t-2 border-slate-200 pt-8 text-right print:break-inside-avoid">
           <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">الشروط والمواصفات وجودة المكاوي هوم</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-slate-600 leading-relaxed font-medium">
+          <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 text-sm text-slate-600 leading-relaxed font-medium">
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-slate-100 text-[#0F172A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
@@ -505,7 +702,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
 
         {/* Space for Signatures */}
-        <div className="mt-12 grid grid-cols-2 gap-8 text-center text-sm font-bold border-t border-slate-200 pt-8">
+        <div className="mt-12 grid grid-cols-2 print:grid-cols-2 gap-8 text-center text-sm font-bold border-t border-slate-200 pt-8 print:break-inside-avoid">
           <div>
             <p className="text-slate-400 mb-8 font-black uppercase text-xs tracking-wider">توقيع واعتماد العميل</p>
             <div className="border-b-2 border-slate-350 border-dashed w-40 mx-auto" />
