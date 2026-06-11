@@ -163,14 +163,47 @@ export default function App() {
           updatedItem.addons = newAddons;
         }
 
-        // Logical constraints when switching opening mechanism
-        if (field === 'opening' && value !== 'مفصلي') {
-          updatedItem.addons = item.addons.filter(id => 
-            id !== 'skewWindow1' && 
-            id !== 'skewWindow2' && 
-            id !== 'skewBalcony1' && 
-            id !== 'skewBalcony2'
-          );
+        // Logical constraints when switching opening mechanism & sash counts (hingePanes)
+        if (field === 'opening') {
+          if (value !== 'مفصلي') {
+            updatedItem.addons = item.addons.filter(id => 
+              id !== 'skewWindow1' && 
+              id !== 'skewWindow2' && 
+              id !== 'skewBalcony1' && 
+              id !== 'skewBalcony2'
+            );
+          } else {
+            const currentHinge = item.hingePanes || 'ضلفة';
+            if (currentHinge === 'ضلفة') {
+              updatedItem.addons = item.addons.filter(id => 
+                id !== 'skewWindow2' && 
+                id !== 'skewBalcony2' && 
+                id !== 'doubleHandle'
+              );
+            } else if (currentHinge === 'ضلفتين') {
+              updatedItem.addons = item.addons.filter(id => 
+                id !== 'skewWindow1' && 
+                id !== 'skewBalcony1'
+              );
+            }
+          }
+        }
+
+        if (field === 'hingePanes') {
+          if (item.opening === 'مفصلي') {
+            if (value === 'ضلفة') {
+              updatedItem.addons = item.addons.filter(id => 
+                id !== 'skewWindow2' && 
+                id !== 'skewBalcony2' && 
+                id !== 'doubleHandle'
+              );
+            } else if (value === 'ضلفتين') {
+              updatedItem.addons = item.addons.filter(id => 
+                id !== 'skewWindow1' && 
+                id !== 'skewBalcony1'
+              );
+            }
+          }
         }
 
         // Logical constraints for innerType (Panel vs Glass)

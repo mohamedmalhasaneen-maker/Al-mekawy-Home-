@@ -32,11 +32,20 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
     const isSkewWindow2 = key === 'skewWindow2';
     const isSkewBalcony1 = key === 'skewBalcony1';
     const isSkewBalcony2 = key === 'skewBalcony2';
+    const isDoubleHandle = key === 'doubleHandle';
 
     const isBalconyAddon = key === 'skewBalcony1' || key === 'skewBalcony2';
     const isWindowAddon = key === 'skewWindow1' || key === 'skewWindow2';
     const isSkewAddon = isBalconyAddon || isWindowAddon;
     const isDoorForbiddenAddon = key === 'skewWindow1' || key === 'skewWindow2' || key === 'skewBalcony1' || key === 'skewBalcony2' || key === 'doubleHandle' || key === 'pombe';
+
+    // Check hinged single/double sash conflicts
+    const isHinged = item.opening === 'مفصلي';
+    const isSingleSash = isHinged && (item.hingePanes || 'ضلفة') === 'ضلفة';
+    const isDoubleSash = isHinged && item.hingePanes === 'ضلفتين';
+
+    const isForbiddenForSingle = isSingleSash && (isSkewWindow2 || isSkewBalcony2 || isDoubleHandle);
+    const isForbiddenForDouble = isDoubleSash && (isSkewWindow1 || isSkewBalcony1);
 
     const isDisabled = 
       (item.innerType === 'panel' && (isDoubleGlass || isColorGlass || isSingleColorGlass)) ||
@@ -52,7 +61,9 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
       (isBalconyAddon && item.itemType !== 'balcony') ||
       (isWindowAddon && item.itemType !== 'window') ||
       (isDoorForbiddenAddon && item.itemType === 'door') ||
-      (isSkewAddon && item.opening !== 'مفصلي');
+      (isSkewAddon && item.opening !== 'مفصلي') ||
+      isForbiddenForSingle ||
+      isForbiddenForDouble;
 
     let conflictTag = '';
     if (item.innerType === 'panel' && (isDoubleGlass || isColorGlass || isSingleColorGlass)) {
@@ -69,6 +80,14 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
       conflictTag = ' (تم اختيار سلك بليسيه)';
     } else if (isSkewAddon && item.opening !== 'مفصلي') {
       conflictTag = ' (متاح لنظام الفتح المفصلي فقط)';
+    } else if (isForbiddenForSingle) {
+      if (isDoubleHandle) {
+        conflictTag = ' (يحتاج لنظام مفصلي ضلفتين)';
+      } else {
+        conflictTag = ' (متاح لنظام المفصلي ضفتين)';
+      }
+    } else if (isForbiddenForDouble) {
+      conflictTag = ' (متاح لنظام المفصلي ضلفة واحدة)';
     } else if (isSkewWindow1 && item.addons.includes('skewWindow2')) {
       conflictTag = ' (تم اختيار ضلفتين)';
     } else if (isSkewWindow2 && item.addons.includes('skewWindow1')) {

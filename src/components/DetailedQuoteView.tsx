@@ -39,28 +39,38 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
   const frameInnerColor = hasSpecialColor ? '#1E293B' : '#F1F5F9';
   const frameStrokeColor = hasSpecialColor ? '#0F172A' : '#94A3B8';
 
-  let glassFill = 'rgba(224, 242, 254, 0.5)';
+  // Glass Type Visualizations matching DynamicPreview
+  let glassFill = 'rgba(224, 242, 254, 0.4)';
   switch (item.glassType) {
+    case 'أبيض شفاف':
+      glassFill = 'rgba(186, 230, 253, 0.35)';
+      break;
     case 'مصنفر':
-      glassFill = 'rgba(241, 245, 249, 0.8)';
+      glassFill = 'rgba(241, 245, 249, 0.75)';
       break;
     case 'بني عاكس':
-      glassFill = 'rgba(180, 83, 9, 0.45)';
+      glassFill = 'rgba(180, 83, 9, 0.4)';
       break;
     case 'أبيض عاكس':
-      glassFill = 'rgba(219, 234, 254, 0.6)';
+      glassFill = 'rgba(226, 232, 240, 0.6)';
+      break;
+    case 'بني سن دبوس':
+      glassFill = 'rgba(120, 53, 4, 0.45)';
       break;
     case 'أزرق عاكس':
-      glassFill = 'rgba(29, 78, 216, 0.45)';
+      glassFill = 'rgba(29, 78, 216, 0.4)';
       break;
     case 'أخضر عاكس':
-      glassFill = 'rgba(4, 120, 87, 0.45)';
+      glassFill = 'rgba(4, 120, 87, 0.4)';
       break;
     case 'أسود عاكس':
       glassFill = 'rgba(15, 23, 42, 0.7)';
       break;
+    case 'مع جورجيا':
+      glassFill = 'rgba(186, 230, 253, 0.35)';
+      break;
     default:
-      glassFill = 'rgba(186, 230, 253, 0.4)';
+      glassFill = 'rgba(186, 230, 253, 0.3)';
   }
 
   const pSize = 3; 
@@ -74,51 +84,150 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
     const paneW = drawW - pSize * 2;
     const paneH = drawH - pSize * 2;
 
+    const isDoubleSash = (opening === 'جرار') || (opening === 'مفصلي' && (item.hingePanes === 'ضلفتين' || item.addons.includes('skewWindow2') || item.addons.includes('skewBalcony2')));
+
     if (isDoor) {
       if (innerType === 'panel') {
-        return (
-          <g>
-            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
-            {Array.from({ length: 6 }).map((_, i) => {
-              const ly = paneY + (paneH / 7) * (i + 1);
-              return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
-            })}
-          </g>
-        );
+        if (isDoubleSash) {
+          const midX = paneX + paneW / 2;
+          return (
+            <g>
+              {/* Left pane */}
+              <rect x={paneX} y={paneY} width={paneW / 2} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 6 }).map((_, i) => {
+                const ly = paneY + (paneH / 7) * (i + 1);
+                return <line key={i} x1={paneX + 1} y1={ly} x2={midX - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+              {/* Right pane */}
+              <rect x={midX} y={paneY} width={paneW / 2} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 6 }).map((_, i) => {
+                const ly = paneY + (paneH / 7) * (i + 1);
+                return <line key={i} x1={midX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+            </g>
+          );
+        } else {
+          return (
+            <g>
+              <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 6 }).map((_, i) => {
+                const ly = paneY + (paneH / 7) * (i + 1);
+                return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+            </g>
+          );
+        }
       } else if (innerType === 'panel_glass') {
         const splitY = paneY + paneH * 0.45;
+        if (isDoubleSash) {
+          const midX = paneX + paneW / 2;
+          return (
+            <g>
+              {/* Left side */}
+              <rect x={paneX} y={paneY} width={paneW / 2} height={splitY - paneY} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${paneX + 1} ${paneY + 1} L ${midX - 1} ${paneY + 1} L ${paneX + 1} ${splitY - 1} Z`} fill="rgba(255,255,255,0.15)" />
+              <rect x={paneX - 0.5} y={splitY} width={paneW / 2 + 0.5} height="2.5" fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <rect x={paneX} y={splitY + 2.5} width={paneW / 2} height={paneH - (splitY - paneY) - 2.5} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 3 }).map((_, i) => {
+                const ly = (splitY + 2.5) + ((paneH - (splitY - paneY) - 2.5) / 4) * (i + 1);
+                return <line key={i} x1={paneX + 1} y1={ly} x2={midX - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+
+              {/* Right side */}
+              <rect x={midX} y={paneY} width={paneW / 2} height={splitY - paneY} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${midX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${midX + 1} ${splitY - 1} Z`} fill="rgba(255,255,255,0.15)" />
+              <rect x={midX} y={splitY} width={paneW / 2 + 0.5} height="2.5" fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <rect x={midX} y={splitY + 2.5} width={paneW / 2} height={paneH - (splitY - paneY) - 2.5} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 3 }).map((_, i) => {
+                const ly = (splitY + 2.5) + ((paneH - (splitY - paneY) - 2.5) / 4) * (i + 1);
+                return <line key={i} x1={midX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+            </g>
+          );
+        } else {
+          return (
+            <g>
+              <rect x={paneX} y={paneY} width={paneW} height={splitY - paneY} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${splitY - 1} Z`} fill="rgba(255,255,255,0.15)" />
+              <rect x={paneX - 0.5} y={splitY} width={paneW + 1} height="2.5" fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <rect x={paneX} y={splitY + 2.5} width={paneW} height={paneH - (splitY - paneY) - 2.5} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+              {Array.from({ length: 3 }).map((_, i) => {
+                const ly = (splitY + 2.5) + ((paneH - (splitY - paneY) - 2.5) / 4) * (i + 1);
+                return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+              })}
+            </g>
+          );
+        }
+      } else {
+        if (isDoubleSash) {
+          const midX = paneX + paneW / 2;
+          return (
+            <g>
+              <rect x={paneX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${paneX + 1} ${paneY + 1} L ${midX - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+              <rect x={midX} y={paneY} width={paneW / 2} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${midX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${midX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+            </g>
+          );
+        } else {
+          return (
+            <g>
+              <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
+              <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+            </g>
+          );
+        }
+      }
+    }
+
+    if (innerType === 'panel') {
+      if (isDoubleSash) {
+        const midX = paneX + paneW / 2;
         return (
           <g>
-            <rect x={paneX} y={paneY} width={paneW} height={splitY - paneY} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
-            <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${splitY - 1} Z`} fill="rgba(255,255,255,0.15)" />
-            <rect x={paneX - 0.5} y={splitY} width={paneW + 1} height="2.5" fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="0.5" />
-            <rect x={paneX} y={splitY + 2.5} width={paneW} height={paneH - (splitY - paneY) - 2.5} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
-            {Array.from({ length: 3 }).map((_, i) => {
-              const ly = (splitY + 2.5) + ((paneH - (splitY - paneY) - 2.5) / 4) * (i + 1);
-              return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+            {/* Left panel sash */}
+            <rect x={paneX} y={paneY} width={paneW / 2} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+            {Array.from({ length: 4 }).map((_, i) => {
+              const ly = paneY + (paneH / 5) * (i + 1);
+              return <line key={i} x1={paneX + 1} y1={ly} x2={midX - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
             })}
+            
+            {/* Right panel sash */}
+            <rect x={midX} y={paneY} width={paneW / 2} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+            {Array.from({ length: 4 }).map((_, i) => {
+              const ly = paneY + (paneH / 5) * (i + 1);
+              return <line key={i} x1={midX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+            })}
+
+            {opening === 'مفصلي' && (
+              <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+                <polyline points={`${midX - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${midX - 1},${paneY + paneH - 1}`} />
+                <polyline points={`${midX + 1},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH / 2} ${midX + 1},${paneY + paneH - 1}`} />
+              </g>
+            )}
           </g>
         );
       } else {
         return (
           <g>
-            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.75" />
-            <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+            <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
+            {Array.from({ length: 4 }).map((_, i) => {
+              const ly = paneY + (paneH / 5) * (i + 1);
+              return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
+            })}
+            {opening === 'مفصلي' && (
+              <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+                <polyline points={`${paneX + paneW - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
+              </g>
+            )}
+            {opening === 'قلاب' && (
+              <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
+                <polyline points={`${paneX + 1},${paneY + paneH - 1} ${paneX + paneW / 2},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
+              </g>
+            )}
           </g>
         );
       }
-    }
-
-    if (innerType === 'panel') {
-      return (
-        <g>
-          <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.75" />
-          {Array.from({ length: 4 }).map((_, i) => {
-            const ly = paneY + (paneH / 5) * (i + 1);
-            return <line key={i} x1={paneX + 1} y1={ly} x2={paneX + paneW - 1} y2={ly} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />;
-          })}
-        </g>
-      );
     }
 
     if (opening === 'جرار') {
@@ -131,11 +240,19 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
           <rect x={midX + 1} y={paneY + 1} width={paneW / 2 - 2} height={paneH - 2} fill="none" stroke={frameInnerColor} strokeWidth="1" />
           <path d={`M ${paneX + 2} ${paneY + paneH / 2} L ${paneX + 5} ${paneY + paneH / 2}`} stroke="#475569" strokeWidth="0.5" />
           <path d={`M ${midX + paneW / 2 - 2} ${paneY + paneH / 2} L ${midX + paneW / 2 - 5} ${paneY + paneH / 2}`} stroke="#475569" strokeWidth="0.5" />
+          
+          {innerType === 'panel_glass' && (
+            <g>
+              <rect x={paneX + 0.5} y={paneY + (paneH * 0.6)} width={(paneW / 2) - 1} height={paneH * 0.4} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <rect x={midX + 0.5} y={paneY + (paneH * 0.6)} width={(paneW / 2) - 1} height={paneH * 0.4} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <line x1={paneX + 1.5} y1={paneY + (paneH * 0.8)} x2={midX - 1.5} y2={paneY + (paneH * 0.8)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+              <line x1={midX + 1.5} y1={paneY + (paneH * 0.8)} x2={paneX + paneW - 1.5} y2={paneY + (paneH * 0.8)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+            </g>
+          )}
         </g>
       );
     } else if (opening === 'مفصلي') {
-      const isSkew2 = item.addons.includes('skewWindow2') || item.addons.includes('skewBalcony2') || item.hingePanes === 'ضلفتين';
-      if (isSkew2) {
+      if (isDoubleSash) {
         const midX = paneX + paneW / 2;
         return (
           <g>
@@ -147,6 +264,14 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
               <polyline points={`${midX - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${midX - 1},${paneY + paneH - 1}`} />
               <polyline points={`${midX + 1},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH / 2} ${midX + 1},${paneY + paneH - 1}`} />
             </g>
+            {innerType === 'panel_glass' && (
+              <g>
+                <rect x={paneX + 0.5} y={paneY + (paneH * 0.65)} width={(paneW / 2) - 1} height={paneH * 0.35} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+                <rect x={midX + 0.5} y={paneY + (paneH * 0.65)} width={(paneW / 2) - 1} height={paneH * 0.35} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+                <line x1={paneX + 1.5} y1={paneY + (paneH * 0.8)} x2={midX - 1.5} y2={paneY + (paneH * 0.8)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+                <line x1={midX + 1.5} y1={paneY + (paneH * 0.8)} x2={paneX + paneW - 1.5} y2={paneY + (paneH * 0.8)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+              </g>
+            )}
           </g>
         );
       } else {
@@ -157,6 +282,12 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
             <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
               <polyline points={`${paneX + paneW - 1},${paneY + 1} ${paneX + 1},${paneY + paneH / 2} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
             </g>
+            {innerType === 'panel_glass' && (
+              <g>
+                <rect x={paneX + 0.5} y={paneY + (paneH * 0.65)} width={paneW - 1} height={paneH * 0.35} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+                <line x1={paneX + 1.5} y1={paneY + (paneH * 0.82)} x2={paneX + paneW - 1.5} y2={paneY + (paneH * 0.82)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+              </g>
+            )}
           </g>
         );
       }
@@ -168,6 +299,12 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
           <g stroke="#94A3B8" strokeWidth="0.5" strokeDasharray="1,1" fill="none">
             <polyline points={`${paneX + 1},${paneY + paneH - 1} ${paneX + paneW / 2},${paneY + 1} ${paneX + paneW - 1},${paneY + paneH - 1}`} />
           </g>
+          {innerType === 'panel_glass' && (
+            <g>
+              <rect x={paneX + 0.5} y={paneY + (paneH * 0.65)} width={paneW - 1} height={paneH * 0.35} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <line x1={paneX + 1.5} y1={paneY + (paneH * 0.82)} x2={paneX + paneW - 1.5} y2={paneY + (paneH * 0.82)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+            </g>
+          )}
         </g>
       );
     } else {
@@ -175,6 +312,12 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
         <g>
           <rect x={paneX} y={paneY} width={paneW} height={paneH} fill={glassFill} stroke={frameStrokeColor} strokeWidth="0.5" />
           <path d={`M ${paneX + 1} ${paneY + 1} L ${paneX + paneW - 1} ${paneY + 1} L ${paneX + 1} ${paneY + paneH - 1} Z`} fill="rgba(255,255,255,0.15)" />
+          {innerType === 'panel_glass' && (
+            <g>
+              <rect x={paneX + 0.5} y={paneY + (paneH * 0.65)} width={paneW - 1} height={paneH * 0.35} fill={frameInnerColor} stroke={frameStrokeColor} strokeWidth="0.5" />
+              <line x1={paneX + 1.5} y1={paneY + (paneH * 0.82)} x2={paneX + paneW - 1.5} y2={paneY + (paneH * 0.82)} stroke={hasSpecialColor ? '#1E293B' : '#CBD5E1'} strokeWidth="0.5" />
+            </g>
+          )}
         </g>
       );
     }
