@@ -51,26 +51,6 @@ export default function Header({ onOpenDevSettings, theme, onToggleTheme }: Head
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto text-right justify-start lg:justify-end"
           >
-            {/* Theme Toggle Button */}
-            <button
-              onClick={onToggleTheme}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-700/50 hover:border-slate-600 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md select-none"
-              title={theme === 'dark' ? "تفعيل الوضع المضيء" : "تفعيل الوضع الداكن"}
-              type="button"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun size={14} className="text-[#FACC15]" />
-                  <span>الوضع المضيء</span>
-                </>
-              ) : (
-                <>
-                  <Moon size={14} className="text-[#94A3B8]" />
-                  <span>الوضع الداكن</span>
-                </>
-              )}
-            </button>
-
             {/* Developer Settings Trigger Button */}
             <button
               type="button"
