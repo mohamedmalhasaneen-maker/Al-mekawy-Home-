@@ -104,7 +104,8 @@ export default function App() {
       opening: 'جرار',
       innerType: 'glass',
       glassType: 'أبيض شفاف',
-      addons: []
+      addons: [],
+      quantity: 1
     }
   ]);
 
@@ -122,7 +123,8 @@ export default function App() {
         opening: 'جرار',
         innerType: 'glass',
         glassType: 'أبيض شفاف',
-        addons: []
+        addons: [],
+        quantity: 1
       }
     ]);
   };
@@ -279,6 +281,7 @@ export default function App() {
     let totalPrice = 0;
 
     const itemsCalculated = items.map(item => {
+      const qty = item.quantity || 1;
       const w = item.width || 0;
       const h = item.height || 0;
       let area = (w * h) / 10000;
@@ -287,7 +290,7 @@ export default function App() {
       const minArea = 1.0;
       if (area > 0 && area < minArea) area = minArea; 
       
-      totalArea += area;
+      totalArea += area * qty;
 
       let profilePrice = profiles[item.profile]?.price || 0;
       if (item.addons.includes('panda')) {
@@ -307,7 +310,8 @@ export default function App() {
         }
       });
 
-      const itemTotal = (area * (profilePrice + addonsPrice)) + flatAddonsPrice;
+      const singleItemTotal = (area * (profilePrice + addonsPrice)) + flatAddonsPrice;
+      const itemTotal = singleItemTotal * qty;
       totalPrice += itemTotal;
 
       return { ...item, area, itemTotal, profilePrice, addonsPrice, flatAddonsPrice };

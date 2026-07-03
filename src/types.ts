@@ -48,6 +48,7 @@ export interface QuoteItem {
   glassType: string;
   hingePanes?: string;
   addons: string[];
+  quantity?: number;
 }
 
 export interface CalculatedItem extends QuoteItem {

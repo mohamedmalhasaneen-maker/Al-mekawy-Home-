@@ -452,29 +452,33 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
       </div>
 
-      {/* Actual Statement Sheet Area */}
-      <div className="p-6 sm:p-10 bg-white text-slate-900 print:p-0" id="quotation-print-sheet">
-        
-        {/* Document Header (For print as well) */}
-        <div className="flex flex-col sm:flex-row print:flex-row justify-between items-start sm:items-stretch print:items-stretch gap-6 pb-8 border-b-4 border-slate-900">
+      {/* Scrollable container to maintain desktop-grade layout stability and gorgeous rendering scale on mobile devices */}
+      <div className="overflow-x-auto w-full print:overflow-visible">
+        {/* Actual Statement Sheet Area */}
+        <div 
+          className="p-4 sm:p-8 md:p-10 bg-white text-slate-900 print:p-0 w-full max-w-5xl mx-auto" 
+          id="quotation-print-sheet"
+        >
+          
+          {/* Document Header (For print as well) */}
+          <div className="flex flex-col md:flex-row print:flex-row justify-between items-start md:items-stretch gap-6 pb-8 border-b-4 border-slate-900">
           <div className="flex items-center gap-4 text-right">
             <img 
               src={logoUrl} 
               alt="Al-mekawy Home Logo" 
-              className="w-20 h-20 rounded-2xl border-2 border-[#0F172A] object-cover shadow-sm print:border-slate-800"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-[#0F172A] object-cover shadow-sm print:border-slate-800"
               referrerPolicy="no-referrer"
             />
             <div>
-              <h1 className="text-3xl sm:text-4xl font-black font-display text-[#0F172A] tracking-tighter">المكاوي هوم</h1>
-              <p className="text-slate-500 font-bold uppercase text-xs tracking-wider mt-1.5">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black font-display text-[#0F172A] tracking-tighter">المكاوي هوم</h1>
+              <p className="text-slate-500 font-bold uppercase text-[10px] sm:text-xs tracking-wider mt-1">
                 Al-mekawy Home • أعمال وتوريدات الـ UPVC الفاخرة للشبابيك والأبواب
               </p>
             </div>
           </div>
           
           <div className="flex flex-col justify-end text-right md:text-left">
-            
-            <div className="mt-6 space-y-2 text-sm text-slate-600 font-bold">
+            <div className="mt-2 space-y-1.5 text-xs sm:text-sm text-slate-600 font-bold">
               <div className="flex items-center gap-2">
                 <span className="text-slate-400">تاريخ العرض:</span>
                 <span className="font-mono text-slate-900">{customer.date || new Date().toISOString().split('T')[0]}</span>
@@ -487,25 +491,25 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
           </div>
 
           {/* Customer Metadata Card */}
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:min-w-[350px] print:min-w-[320px] print:flex-shrink-0 space-y-3 text-right flex-none print:bg-slate-50 print:border-slate-300">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">بيانات العميل المحترم</h3>
-            <div className="space-y-2 text-sm">
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 w-full md:w-[350px] space-y-3.5 text-right flex-none print:w-[320px] print:flex-shrink-0 print:bg-slate-50 print:border-slate-300">
+            <h3 className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">بيانات العميل المحترم</h3>
+            <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex items-start justify-between gap-4">
                 <span className="text-slate-500 shrink-0 font-bold">اسم العميل:</span>
-                <span className="font-black text-slate-900 text-base">{customer.name || "عميل مكاوي هوم الموقر"}</span>
+                <span className="font-black text-slate-900 text-sm sm:text-base">{customer.name || "عميل مكاوي هوم الموقر"}</span>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <span className="text-slate-500 shrink-0 font-bold">رقم الهاتف:</span>
-                <span className="font-bold text-slate-900 font-mono" dir="ltr">{customer.phone || "لم يحدد بشكل تفصيلي"}</span>
+                <span className="font-bold text-slate-900 font-mono text-xs sm:text-sm" dir="ltr">{customer.phone || "لم يحدد بشكل تفصيلي"}</span>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <span className="text-slate-500 shrink-0 font-bold">موقع التركيب:</span>
-                <span className="font-bold text-slate-900">{customer.address || "بناءً على مقاسات العميل"}</span>
+                <span className="font-bold text-slate-900 text-xs sm:text-sm">{customer.address || "بناءً على مقاسات العميل"}</span>
               </div>
               {customer.deliveryDate && (
                 <div className="flex items-start justify-between gap-4 border-t border-dashed border-slate-200 pt-1.5 mt-1.5">
                   <span className="text-slate-500 shrink-0 font-bold">أقصى تاريخ للتسليم:</span>
-                  <span className="font-black text-[#0F172A] font-mono" dir="ltr">{customer.deliveryDate}</span>
+                  <span className="font-black text-[#0F172A] font-mono text-xs sm:text-sm" dir="ltr">{customer.deliveryDate}</span>
                 </div>
               )}
             </div>
@@ -521,16 +525,17 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
 
         {/* Detailed Sheet Table */}
         <div className="overflow-x-auto my-8 border-2 border-slate-900 rounded-2xl overflow-hidden print:border-slate-800">
-          <table className="w-full border-collapse text-right text-sm">
+          <table className="w-full border-collapse text-right text-xs sm:text-sm">
             <thead>
-              <tr className="bg-[#0F172A] text-white font-display border-b-2 border-slate-900 font-black text-xs uppercase tracking-wider print:bg-[#0F172A] print:text-white">
-                <th className="py-4 px-3 text-center w-12 border-l border-slate-800">م</th>
-                <th className="py-4 px-4 border-l border-slate-800">بيان البند والموقع التوضيحي</th>
-                <th className="py-4 px-3 text-center border-l border-slate-800">المقاسات (سم)</th>
-                <th className="py-4 px-3 text-center border-l border-slate-800">المساحة م²</th>
-                <th className="py-4 px-4 border-l border-slate-800">تفاصيل القطاع والزجاج</th>
-                <th className="py-4 px-4 border-l border-slate-800">الإضافات الاختيارية</th>
-                <th className="py-4 px-4 text-left">إجمالي البند</th>
+              <tr className="bg-[#0F172A] text-white font-display border-b-2 border-slate-900 font-black text-[10px] sm:text-xs uppercase tracking-wider print:bg-[#0F172A] print:text-white">
+                <th className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center w-8 sm:w-12 border-l border-slate-800">م</th>
+                <th className="py-2.5 sm:py-4 px-2 sm:px-4 border-l border-slate-800">بيان البند والموقع التوضيحي</th>
+                <th className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center border-l border-slate-800">المقاسات (سم)</th>
+                <th className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center border-l border-slate-800">المساحة م²</th>
+                <th className="py-2.5 sm:py-4 px-1 sm:px-2 text-center border-l border-slate-800">العدد</th>
+                <th className="py-2.5 sm:py-4 px-2 sm:px-4 border-l border-slate-800">تفاصيل القطاع والزجاج</th>
+                <th className="py-2.5 sm:py-4 px-1.5 sm:px-4 border-l border-slate-800">الإضافات الاختيارية</th>
+                <th className="py-2.5 sm:py-4 px-2 sm:px-4 text-left">إجمالي البند</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -540,61 +545,66 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors print:hover:bg-transparent">
                     {/* Item Serial */}
-                    <td className="py-4 px-3 text-center font-mono font-bold text-slate-400 border-l border-slate-100">
+                    <td className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center font-mono font-bold text-slate-400 border-l border-slate-100">
                       {String(idx + 1).padStart(2, '0')}
                     </td>
                     
                     {/* Title & Preview Drawing */}
-                    <td className="py-4 px-4 border-l border-slate-100">
-                      <div className="flex items-center justify-between gap-4 min-w-[200px]">
+                    <td className="py-2.5 sm:py-4 px-2 sm:px-4 border-l border-slate-100">
+                      <div className="flex items-center justify-between gap-3 min-w-[160px] sm:min-w-[200px]">
                         <div className="text-right">
-                          <div className="font-bold text-slate-900 text-base flex items-center gap-2">
-                            {item.title}
-                            <span className="text-[10px] font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded print:bg-slate-200">
+                          <div className="font-bold text-slate-900 text-xs sm:text-base flex flex-wrap items-center gap-1 sm:gap-2">
+                            <span>{item.title}</span>
+                            <span className="text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-700 px-1 sm:px-1.5 py-0.5 rounded print:bg-slate-200 shrink-0">
                               {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
                             </span>
                           </div>
-                          <div className="text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
+                          <div className="text-[10px] sm:text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>
                         </div>
-                        <div className="shrink-0 w-[54px] h-[54px] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-0.5 shadow-sm print:bg-white print:border-slate-300">
+                        <div className="shrink-0 w-10 h-10 sm:w-[54px] sm:h-[54px] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-0.5 shadow-sm print:bg-white print:border-slate-300">
                           <MiniItemPreview item={item} />
                         </div>
                       </div>
                     </td>
 
                     {/* Width x Height */}
-                    <td className="py-4 px-3 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100" dir="ltr">
+                    <td className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-xs sm:text-sm" dir="ltr">
                       {item.width} × {item.height}
                     </td>
 
                     {/* Area Calculations */}
-                    <td className="py-4 px-3 text-center border-l border-slate-100">
+                    <td className="py-2.5 sm:py-4 px-1.5 sm:px-3 text-center border-l border-slate-100 text-xs sm:text-sm">
                       <div className="font-bold text-[#0F172A]">{item.area.toFixed(2)} م²</div>
                       {isMinArea && (
-                        <div className="text-[10px] text-amber-600 font-extrabold mt-0.5 whitespace-nowrap print:text-amber-700">
-                          (الحد الأدنى الصناعي {threshold.toFixed(1)} م²)
+                        <div className="text-[9px] sm:text-[10px] text-amber-600 font-extrabold mt-0.5 whitespace-nowrap print:text-amber-700">
+                          (الحد الأدنى {threshold.toFixed(1)} م²)
                         </div>
                       )}
                     </td>
 
+                    {/* Quantity */}
+                    <td className="py-2.5 sm:py-4 px-1 sm:px-2 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-xs sm:text-sm">
+                      {item.quantity || 1}
+                    </td>
+
                      {/* Specs & glass */}
-                    <td className="py-4 px-4 border-l border-slate-100">
-                      <div className="font-medium text-slate-800">
+                    <td className="py-2.5 sm:py-4 px-2 sm:px-4 border-l border-slate-100 text-xs">
+                      <div className="font-bold text-slate-800 text-xs sm:text-sm">
                         {profiles[item.profile]?.name || item.profile}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        الجزء الداخلي: {item.innerType === 'panel' ? 'بنل بالكامل' : item.innerType === 'panel_glass' ? 'بنل مع زجاج' : 'زجاج بالكامل'}
+                      <div className="text-[10px] sm:text-xs text-slate-500 mt-1 leading-normal">
+                        جزء داخلي: {item.innerType === 'panel' ? 'بنل بالكامل' : item.innerType === 'panel_glass' ? 'بنل مع زجاج' : 'زجاج بالكامل'}
                       </div>
                       {item.innerType !== 'panel' && (
-                        <div className="text-xs text-slate-400">الزجاج: {item.glassType}</div>
+                        <div className="text-[10px] sm:text-xs text-slate-400">زجاج: {item.glassType}</div>
                       )}
                       {item.opening === 'مفصلي' && (
-                        <div className="text-xs text-slate-500 font-bold mt-0.5">عدد الضلف: {item.hingePanes || 'ضلفة'}</div>
+                        <div className="text-[10px] sm:text-xs text-slate-500 font-bold mt-0.5">ضلف: {item.hingePanes || 'ضلفة'}</div>
                       )}
                     </td>
 
                     {/* Addons list */}
-                    <td className="py-4 px-4 border-l border-slate-100 text-xs text-slate-600">
+                    <td className="py-2.5 sm:py-4 px-1.5 sm:px-4 border-l border-slate-100 text-[10px] sm:text-xs text-slate-600">
                       {item.addons.length > 0 ? (
                         <div className="flex flex-col gap-0.5">
                           {item.addons.map(addonId => (
@@ -609,15 +619,20 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
                     </td>
 
                     {/* Total Rate & cost */}
-                    <td className="py-4 px-4 text-left">
-                      <div className="font-black text-[#0F172A] font-display text-base">
+                    <td className="py-2.5 sm:py-4 px-2 sm:px-4 text-left whitespace-nowrap">
+                      <div className="font-black text-[#0F172A] font-display text-xs sm:text-base">
                         {formatCurrency(item.itemTotal)}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
+                      <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
                         بمعدل {formatCurrency(item.profilePrice + item.addonsPrice)} / م²
                       </div>
+                      {item.quantity && item.quantity > 1 ? (
+                        <div className="text-[9px] sm:text-[10px] text-slate-500 font-extrabold mt-0.5 print:text-slate-600">
+                          ({formatCurrency(item.itemTotal / item.quantity)} × {item.quantity})
+                        </div>
+                      ) : null}
                       {item.flatAddonsPrice && item.flatAddonsPrice > 0 ? (
-                        <div className="text-[10px] text-emerald-700 font-extrabold mt-0.5 print:text-emerald-800">
+                        <div className="text-[9px] sm:text-[10px] text-emerald-700 font-extrabold mt-0.5 print:text-emerald-800">
                           + {formatCurrency(item.flatAddonsPrice)} (مقطوع)
                         </div>
                       ) : null}
@@ -630,7 +645,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
 
         {/* Grand Total Area and Calculations */}
-        <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row print:flex-row justify-between items-center print:items-center print:justify-between gap-6 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-slate-800 print:break-inside-avoid">
+        <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 flex flex-row justify-between items-center gap-6 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-slate-800 print:break-inside-avoid">
           <div className="text-right">
             <h4 className="font-display font-black text-xl mb-1 text-white print:text-[#0F172A]">مجموع مسطحات الأعمال</h4>
             <p className="text-slate-400 text-sm print:text-slate-500">
@@ -734,7 +749,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         <div className="mt-10 border-t-2 border-slate-200 pt-8 text-right print:break-inside-avoid">
           <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">الشروط والمواصفات وجودة المكاوي هوم</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 text-sm text-slate-600 leading-relaxed font-medium">
+          <div className="grid grid-cols-2 gap-6 text-sm text-slate-600 leading-relaxed font-medium">
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-slate-100 text-[#0F172A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
@@ -868,6 +883,7 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
         </div>
 
       </div>
+     </div>
     </div>
   );
 }

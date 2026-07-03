@@ -140,10 +140,10 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8">
         {/* المقاسات */}
         <div className="space-y-4">
-          <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المقاسات</h3>
+          <h3 className="font-black text-[#0F172A] border-b-2 border-slate-100 pb-2 text-sm uppercase tracking-wider">المقاسات والكمية</h3>
           <div className="space-y-3">
             {/* Display side by side on mobile/tablet, vertically stacked on desktop */}
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="grid grid-cols-3 lg:grid-cols-1 gap-3">
               <div>
                 <label className="block text-[10.5px] sm:text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العرض (سم)</label>
                 <input
@@ -151,7 +151,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                   min="0"
                   value={item.width || ''}
                   onChange={(e) => updateItem(item.id, 'width', e.target.value ? Number(e.target.value) : 0)}
-                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center"
+                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center font-bold"
                 />
               </div>
               <div>
@@ -161,18 +161,34 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                   min="0"
                   value={item.height || ''}
                   onChange={(e) => updateItem(item.id, 'height', e.target.value ? Number(e.target.value) : 0)}
-                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center"
+                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-[10.5px] sm:text-xs font-extrabold text-slate-500 mb-1 uppercase tracking-wider">العدد</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={item.quantity || 1}
+                  onChange={(e) => updateItem(item.id, 'quantity', e.target.value ? Math.max(1, Number(e.target.value)) : 1)}
+                  className="w-full p-2 sm:p-2.5 text-xs sm:text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all print:border-none print:p-0 print:font-bold text-center font-bold text-[#0F172A]"
                 />
               </div>
             </div>
             
             <div className="bg-[#F8F9FA] p-3 rounded-xl border border-slate-200/60 print:bg-transparent print:p-0 print:border-none space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500 font-bold">المساحة:</span>
-                <span className="text-base text-[#0F172A] font-black">{item.area.toFixed(2)} م²</span>
+              <div className="flex justify-between items-center text-xs sm:text-sm">
+                <span className="text-slate-500 font-bold">المساحة للقطعة:</span>
+                <span className="text-slate-900 font-black">{item.area.toFixed(2)} م²</span>
               </div>
+              {item.quantity && item.quantity > 1 ? (
+                <div className="flex justify-between items-center border-t border-slate-200/50 pt-1.5 mt-1 text-xs sm:text-sm">
+                  <span className="text-slate-550 text-slate-500 font-bold">إجمالي المساحة:</span>
+                  <span className="text-[#0F172A] font-black">{(item.area * item.quantity).toFixed(2)} م²</span>
+                </div>
+              ) : null}
               {((item.width * item.height) / 10000) < 1.0 && (item.width > 0 && item.height > 0) && (
-                <div className="text-[10px] text-amber-600 font-extrabold text-right">
+                <div className="text-[10px] text-amber-600 font-extrabold text-right pt-0.5">
                   * تم تطبيق الحد الأدنى (1.0 م²)
                 </div>
               )}
@@ -496,9 +512,16 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
             </span>
           ) : null}
         </div>
-        <div className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
-          إجمالي البند: 
-          <span className="text-xl sm:text-2xl font-black text-[#0F172A] font-display">{formatCurrency(item.itemTotal)}</span>
+        <div className="text-lg sm:text-xl font-bold text-slate-900 flex flex-wrap items-center gap-x-3 gap-y-1 justify-end">
+          {item.quantity && item.quantity > 1 ? (
+            <span className="text-xs sm:text-sm text-slate-400 font-bold ml-2">
+              ({formatCurrency(item.itemTotal / item.quantity)} × {item.quantity})
+            </span>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <span>إجمالي البند:</span>
+            <span className="text-xl sm:text-2xl font-black text-[#0F172A] font-display">{formatCurrency(item.itemTotal)}</span>
+          </div>
         </div>
       </div>
     </motion.div>
