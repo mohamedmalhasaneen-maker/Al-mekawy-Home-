@@ -359,6 +359,50 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
     return Math.max(0, calculations.totalPrice - discountAmount + totalNotesAmount);
   }, [calculations.totalPrice, discountAmount, totalNotesAmount]);
 
+  const whatsappUrl = React.useMemo(() => {
+    const todayStr = customer.date || new Date().toISOString().split('T')[0];
+    const clientName = (customer.name || 'عميل مكاوي هوم الموقر').trim();
+    const clientPhone = (customer.phone || 'غير محدد بشكل تفصيلي').trim();
+    const clientAddress = (customer.address || 'بناءً على مقاسات العميل').trim();
+    const deliveryStr = customer.deliveryDate ? `⏱️ *تاريخ التوريد المتوقع:* ${customer.deliveryDate}\n` : '';
+
+    const itemsText = calculations.itemsCalculated.map((item, idx) => {
+      const typeLabel = item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك';
+      const qty = item.quantity || 1;
+      const addonsList = item.addons.map(addonId => addons[addonId]?.name || addonId).join('، ');
+      const addonsStr = addonsList ? ` (إضافات: ${addonsList})` : '';
+      return `🔹 *[${idx + 1}] ${item.title} (${typeLabel})*\n   📐 المقاس: ${item.width} × ${item.height} سم | المساحة: ${item.area.toFixed(2)} م²\n   📦 القطاع: ${profiles[item.profile]?.name || item.profile} | ${item.glassType}${addonsStr}\n   👥 العدد: ${qty} | الإجمالي: ${formatCurrency(item.itemTotal)}`;
+    }).join('\n\n');
+
+    const discountStr = discountValue > 0 ? `🧧 *الخصم:* - ${formatCurrency(discountAmount)}\n` : '';
+    const notesStr = totalNotesAmount !== 0 ? `➕ *تسويات وملاحظات إضافية:* ${totalNotesAmount > 0 ? '+' : ''}${formatCurrency(totalNotesAmount)}\n` : '';
+
+    const messageText = `السلام عليكم ورحمة الله وبركاته،
+*عرض سعر تفصيلي من المكاوي هوم (Al-mekawy Home)* 🏠✨
+لأعمال وتوريدات الـ UPVC الفاخرة للشبابيك والأبواب.
+
+*بيانات العميل الموقر:*
+👤 *الاسم:* ${clientName}
+📞 *رقم الهاتف:* ${clientPhone}
+📍 *موقع التركيب:* ${clientAddress}
+🗓️ *تاريخ العرض:* ${todayStr}
+${deliveryStr}
+*تفاصيل البنود:*
+${itemsText}
+
+*الملخص المالي:*
+📐 *إجمالي المساحة:* ${calculations.totalArea.toFixed(2)} م²
+💵 *القيمة الكلية:* ${formatCurrency(calculations.totalPrice)}
+${discountStr}${notesStr}💰 *صافي القيمة النهائية:* *${formatCurrency(finalPrice)}*
+
+شكراً لثقتكم بالمكاوي هوم! لمزيد من التفاصيل، نسعد بتواصلكم معنا.`;
+
+    const cleanPhone = customer.phone ? customer.phone.replace(/\D/g, '') : '';
+    const whatsappPhone = cleanPhone.startsWith('01') && cleanPhone.length === 11 ? `2${cleanPhone}` : cleanPhone;
+    
+    return `https://api.whatsapp.com/send?${whatsappPhone ? `phone=${whatsappPhone}&` : ''}text=${encodeURIComponent(messageText)}`;
+  }, [customer, calculations, profiles, addons, discountValue, discountAmount, totalNotesAmount, finalPrice, formatCurrency]);
+
   const exportToPdf = async () => {
     if (isExporting) return;
     setIsExporting(true);
@@ -775,13 +819,13 @@ export default function DetailedQuoteView({ customer, calculations, formatCurren
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-slate-100 text-[#0F172A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
                 <p>
-                  <strong className="text-slate-900 font-bold">الإكسسوارات والمقابض:</strong> نلتزم باستخدام إكسسوارات (G-U/مكفولة ومستوردة) المقاومة للتآكل والصدأ لضمان سلاسة الفتح والجر.
+                  <strong className="text-slate-900 font-bold">الإكسسوارات والمقابض:</strong> نلتزم باستخدام الإكسسوارات التركية الأصلية عالية الجودة <span className="font-mono text-xs font-black text-slate-800">[VORNE , FORNAX , GIVESS , ROTEX]</span> المقاومة للتآكل والصدأ لضمان سلاسة التشغيل.
                 </p>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-slate-100 text-[#0F172A] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</span>
                 <p>
-                  <strong className="text-slate-900 font-bold">الزجاج ونوعيته:</strong> الزجاج دبل جلاس عازل أو عاكس حسب اختياركم مع الالتزام بأحدث تقنيات الحقن والخلو من الشوائب.
+                  <strong className="text-slate-900 font-bold">الزجاج ونوعيته:</strong> زجاج دبل (مع جورجيا أو سادة حسب اختياركم) عازل أو عاكس.
                 </p>
               </li>
               <li className="flex items-start gap-2.5">

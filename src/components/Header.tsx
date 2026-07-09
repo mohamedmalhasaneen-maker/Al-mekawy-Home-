@@ -1,4 +1,5 @@
-import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon } from 'lucide-react';
+import { useState } from 'react';
+import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -18,9 +19,29 @@ interface HeaderProps {
   onOpenDevSettings: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  savedQuotesCount: number;
+  onOpenSavedQuotes: () => void;
+  onSaveQuoteAuto: () => void;
 }
 
-export default function Header({ onOpenDevSettings, theme, onToggleTheme }: HeaderProps) {
+export default function Header({ 
+  onOpenDevSettings, 
+  theme, 
+  onToggleTheme, 
+  savedQuotesCount, 
+  onOpenSavedQuotes,
+  onSaveQuoteAuto
+}: HeaderProps) {
+  const [justSaved, setJustSaved] = useState(false);
+
+  const handleAutoSave = () => {
+    onSaveQuoteAuto();
+    setJustSaved(true);
+    setTimeout(() => {
+      setJustSaved(false);
+    }, 2000);
+  };
+
   return (
     <header className="bg-[#0F172A] text-white py-6 border-b-4 border-[#FACC15] shadow-lg print:hidden">
       <div className="max-w-5xl mx-auto px-4 flex flex-col gap-6 text-right">
@@ -51,6 +72,42 @@ export default function Header({ onOpenDevSettings, theme, onToggleTheme }: Head
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto text-right justify-start lg:justify-end"
           >
+            {/* Save current Quote button */}
+            <button
+              type="button"
+              onClick={handleAutoSave}
+              disabled={justSaved}
+              className={`${
+                justSaved 
+                  ? 'bg-teal-600 hover:bg-teal-700' 
+                  : 'bg-emerald-600 hover:bg-emerald-700'
+              } text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-emerald-950/20 group/btn`}
+              title="حفظ عرض السعر الحالي تلقائياً"
+            >
+              {justSaved ? (
+                <>
+                  <Check size={14} className="text-white animate-bounce" />
+                  <span>تم حفظ العرض بنجاح! ✓</span>
+                </>
+              ) : (
+                <>
+                  <Save size={14} className="text-white" />
+                  <span>حفظ عرض السعر</span>
+                </>
+              )}
+            </button>
+
+            {/* Saved Quotes dropdown trigger */}
+            <button
+              type="button"
+              onClick={onOpenSavedQuotes}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-indigo-950/20 group/btn"
+              title="عرض وإدارة عروض الأسعار المحفوظة في المكاوي هوم"
+            >
+              <FileText size={14} className="text-white" />
+              <span>عروض الأسعار {savedQuotesCount > 0 ? `(${savedQuotesCount})` : ''}</span>
+            </button>
+
             {/* Developer Settings Trigger Button */}
             <button
               type="button"

@@ -135,19 +135,40 @@ async function startServer() {
 `;
 
       const aiClient = getAiClient();
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: formattedMessages,
-        config: {
-          systemInstruction: systemInstruction,
-          temperature: 0.7,
-        }
-      });
+      let response = null;
+      let retries = 3;
+      let delay = 1000;
 
-      const replyText = response.text || "عذراً، لم أستطع صياغة رد مناسب حالياً. يمكنك الاتصال بنا مباشرة لمساعدتك فورا!";
+      while (retries > 0) {
+        try {
+          response = await aiClient.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: formattedMessages,
+            config: {
+              systemInstruction: systemInstruction,
+              temperature: 0.7,
+            }
+          });
+          break; // success, break out of loop
+        } catch (err: any) {
+          retries--;
+          const errStatus = err?.status || err?.code || (err?.message && err.message.includes("503") ? 503 : 0);
+          const isRateLimitOrUnavailable = errStatus === 503 || errStatus === 429 || (err?.message && (err.message.includes("high demand") || err.message.includes("503") || err.message.includes("UNAVAILABLE")));
+          
+          if (retries > 0 && isRateLimitOrUnavailable) {
+            console.log(`[Gemini API Info] Model busy or experiencing high demand. Retrying in ${delay}ms... (Retries left: ${retries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // exponential backoff
+          } else {
+            throw err; // throw the error to be caught by the outer block
+          }
+        }
+      }
+
+      const replyText = response?.text || "عذراً، لم أستطع صياغة رد مناسب حالياً. يمكنك الاتصال بنا مباشرة لمساعدتك فورا!";
       return res.json({ reply: replyText });
     } catch (error: any) {
-      console.error("AI Error:", error);
+      console.warn("[Gemini API Info] Call was not completed successfully:", error?.message || error);
       // Give a friendly message even if API key is missing
       return res.status(200).json({ 
         reply: "أهلاً بك! محبي المكاوي هوم، يبدو أن مفتاح خدمة الذكاء الاصطناعي معطل حالياً أو لم يتم تهيئته بشكل كامل. يمكنك التواصل الفوري معنا عبر الاتصال بـ 01141761261 أو عبر رسائل الواتساب للحصول على كافة عروض الأسعار والاستشارات مجاناً!" 

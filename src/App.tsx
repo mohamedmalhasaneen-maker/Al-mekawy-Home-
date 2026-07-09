@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Calculator, QrCode, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon } from './types';
+import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon, SavedQuote } from './types';
 import { PROFILES, ADDONS } from './constants';
 import { DevSettingsModal } from './components/DevSettingsModal';
 
@@ -14,6 +14,8 @@ import SummaryBox from './components/SummaryBox';
 import PricingTable from './components/PricingTable';
 import Features from './components/Features';
 import QrModal from './components/QrModal';
+import SavedQuotesModal from './components/SavedQuotesModal';
+import PasswordModal from './components/PasswordModal';
 import AiMekawyChat from './components/AiMekawyChat';
 
 const formatCurrency = (value: number) => {
@@ -25,7 +27,18 @@ const formatCurrency = (value: number) => {
 export default function App() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
+  const [isSavedQuotesModalOpen, setIsSavedQuotesModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState<'input' | 'quote'>('input');
+
+  const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>(() => {
+    try {
+      const saved = localStorage.getItem('almekawy_saved_quotes');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -324,6 +337,57 @@ export default function App() {
     setCustomer(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSaveCurrentQuote = (name: string) => {
+    const finalPrice = (() => {
+      const val = customer.discountValue || 0;
+      const type = customer.discountType || 'cash';
+      const notesAmount = customer.notesAmount || 0;
+      const additionalNotesSum = customer.additionalNotes?.reduce((sum, n) => sum + (n.amount || 0), 0) || 0;
+      const totalNotesAmount = notesAmount + additionalNotesSum;
+      const discountAmt = type === 'percentage' ? (calculations.totalPrice * (val / 100)) : val;
+      return Math.max(0, calculations.totalPrice - discountAmt + totalNotesAmount);
+    })();
+
+    const newQuote: SavedQuote = {
+      id: Date.now().toString(),
+      name: name,
+      customer: customer,
+      items: items,
+      date: new Date().toLocaleDateString('ar-EG'),
+      totalPrice: finalPrice,
+    };
+    const updated = [newQuote, ...savedQuotes];
+    setSavedQuotes(updated);
+    try {
+      localStorage.setItem('almekawy_saved_quotes', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLoadQuote = (quote: SavedQuote) => {
+    setCustomer(quote.customer);
+    setItems(quote.items);
+    setActiveMainTab('input');
+  };
+
+  const handleDeleteQuote = (id: string) => {
+    const updated = savedQuotes.filter(q => q.id !== id);
+    setSavedQuotes(updated);
+    try {
+      localStorage.setItem('almekawy_saved_quotes', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveQuoteAuto = () => {
+    const defaultName = customer.name?.trim() 
+      ? `عرض سعر - ${customer.name.trim()}`
+      : `عرض سعر تلقائي - ${new Date().toLocaleDateString('ar-EG')} ${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`;
+    handleSaveCurrentQuote(defaultName);
+  };
+
   const handlePrint = () => {
     setActiveMainTab('quote');
     setTimeout(() => {
@@ -344,6 +408,9 @@ export default function App() {
         onOpenDevSettings={() => setIsDevModalOpen(true)} 
         theme={theme}
         onToggleTheme={toggleTheme}
+        savedQuotesCount={savedQuotes.length}
+        onOpenSavedQuotes={() => setIsPasswordModalOpen(true)}
+        onSaveQuoteAuto={handleSaveQuoteAuto}
       />
 
       <main className="max-w-5xl mx-auto px-4 py-12">
@@ -481,6 +548,35 @@ export default function App() {
               addons={addons}
               onSavePrices={handleSavePrices}
               onResetPrices={handleResetPrices}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isSavedQuotesModalOpen && (
+            <SavedQuotesModal
+              isOpen={isSavedQuotesModalOpen}
+              onClose={() => setIsSavedQuotesModalOpen(false)}
+              savedQuotes={savedQuotes}
+              onSaveCurrent={handleSaveCurrentQuote}
+              onLoadQuote={handleLoadQuote}
+              onDeleteQuote={handleDeleteQuote}
+              currentCustomerName={customer.name}
+              formatCurrency={formatCurrency}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isPasswordModalOpen && (
+            <PasswordModal
+              isOpen={isPasswordModalOpen}
+              onClose={() => setIsPasswordModalOpen(false)}
+              onSuccess={() => {
+                setIsPasswordModalOpen(false);
+                setIsSavedQuotesModalOpen(true);
+              }}
+              requiredPassword="662006"
             />
           )}
         </AnimatePresence>

@@ -59,6 +59,15 @@ export interface CalculatedItem extends QuoteItem {
   flatAddonsPrice?: number;
 }
 
+export interface SavedQuote {
+  id: string;
+  name: string;
+  customer: CustomerInfo;
+  items: QuoteItem[];
+  date: string;
+  totalPrice: number;
+}
+
 export interface CalculationResult {
   itemsCalculated: CalculatedItem[];
   totalArea: number;
