@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Calculator, QrCode, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -39,6 +39,22 @@ export default function App() {
       return [];
     }
   });
+
+  useEffect(() => {
+    fetch('/api/quotes')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSavedQuotes(data);
+          try {
+            localStorage.setItem('almekawy_saved_quotes', JSON.stringify(data));
+          } catch (e) {}
+        }
+      })
+      .catch(err => {
+        console.error("Error loading quotes from server:", err);
+      });
+  }, []);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -356,13 +372,31 @@ export default function App() {
       date: new Date().toLocaleDateString('ar-EG'),
       totalPrice: finalPrice,
     };
-    const updated = [newQuote, ...savedQuotes];
+    const updated = [newQuote, ...savedQuotes.filter(q => q.id !== newQuote.id)];
     setSavedQuotes(updated);
     try {
       localStorage.setItem('almekawy_saved_quotes', JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }
+
+    // Save to the backend server
+    fetch('/api/quotes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newQuote),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          console.log("Successfully saved quote to backend server");
+        }
+      })
+      .catch(err => {
+        console.error("Error saving quote to backend server:", err);
+      });
   };
 
   const handleLoadQuote = (quote: SavedQuote) => {
@@ -379,6 +413,20 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+
+    // Delete from the backend server
+    fetch(`/api/quotes/${id}`, {
+      method: 'DELETE',
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          console.log("Successfully deleted quote from backend server");
+        }
+      })
+      .catch(err => {
+        console.error("Error deleting quote from backend server:", err);
+      });
   };
 
   const handleSaveQuoteAuto = () => {

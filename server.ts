@@ -1,15 +1,72 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const QUOTES_FILE = path.join(process.cwd(), "saved_quotes.json");
+
+function readSavedQuotes(): any[] {
+  try {
+    if (fs.existsSync(QUOTES_FILE)) {
+      const data = fs.readFileSync(QUOTES_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error("Error reading saved quotes:", err);
+  }
+  return [];
+}
+
+function writeSavedQuotes(quotes: any[]) {
+  try {
+    fs.writeFileSync(QUOTES_FILE, JSON.stringify(quotes, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing saved quotes:", err);
+  }
+}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Quotes API Endpoints
+  app.get("/api/quotes", (req, res) => {
+    const quotes = readSavedQuotes();
+    res.json(quotes);
+  });
+
+  app.post("/api/quotes", (req, res) => {
+    try {
+      const newQuote = req.body;
+      if (!newQuote || !newQuote.id || !newQuote.name) {
+        return res.status(400).json({ error: "بيانات عرض السعر غير مكتملة" });
+      }
+      const quotes = readSavedQuotes();
+      const filtered = quotes.filter((q: any) => q.id !== newQuote.id);
+      const updated = [newQuote, ...filtered];
+      writeSavedQuotes(updated);
+      res.json({ success: true, quote: newQuote });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/quotes/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const quotes = readSavedQuotes();
+      const updated = quotes.filter((q: any) => q.id !== id);
+      writeSavedQuotes(updated);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Initialize Gemini Client safely
   let ai: GoogleGenAI | null = null;
