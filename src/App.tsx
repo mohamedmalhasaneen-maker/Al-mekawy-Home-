@@ -40,7 +40,7 @@ export default function App() {
     }
   });
 
-  useEffect(() => {
+  const fetchQuotesFromServer = () => {
     fetch('/api/quotes')
       .then(res => res.json())
       .then(data => {
@@ -54,6 +54,10 @@ export default function App() {
       .catch(err => {
         console.error("Error loading quotes from server:", err);
       });
+  };
+
+  useEffect(() => {
+    fetchQuotesFromServer();
   }, []);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -392,6 +396,7 @@ export default function App() {
       .then(data => {
         if (data.success) {
           console.log("Successfully saved quote to backend server");
+          fetchQuotesFromServer();
         }
       })
       .catch(err => {
@@ -422,6 +427,7 @@ export default function App() {
       .then(data => {
         if (data.success) {
           console.log("Successfully deleted quote from backend server");
+          fetchQuotesFromServer();
         }
       })
       .catch(err => {
@@ -621,6 +627,7 @@ export default function App() {
               isOpen={isPasswordModalOpen}
               onClose={() => setIsPasswordModalOpen(false)}
               onSuccess={() => {
+                fetchQuotesFromServer();
                 setIsPasswordModalOpen(false);
                 setIsSavedQuotesModalOpen(true);
               }}
