@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Save, Trash2, FolderOpen, Calendar, User, FileText, Check, AlertCircle } from 'lucide-react';
+import { X, Save, Trash2, FolderOpen, Calendar, User, FileText, Check, AlertCircle, RefreshCw, Cloud, Database } from 'lucide-react';
 import { SavedQuote } from '../types';
 
 interface SavedQuotesModalProps {
@@ -12,6 +12,7 @@ interface SavedQuotesModalProps {
   onDeleteQuote: (id: string) => void;
   currentCustomerName: string;
   formatCurrency: (val: number) => string;
+  onRefresh: () => void;
 }
 
 export default function SavedQuotesModal({
@@ -23,11 +24,13 @@ export default function SavedQuotesModal({
   onDeleteQuote,
   currentCustomerName,
   formatCurrency,
+  onRefresh,
 }: SavedQuotesModalProps) {
   const [newQuoteName, setNewQuoteName] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showConfirmLoad, setShowConfirmLoad] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Set default name when customer name changes or modal opens
   useEffect(() => {
@@ -84,16 +87,36 @@ export default function SavedQuotesModal({
               <FileText size={22} className="text-[#FACC15]" />
             </div>
             <div>
-              <h3 className="text-lg font-black tracking-tight font-display text-white">إدارة عروض الأسعار المحفوظة</h3>
-              <p className="text-xs text-slate-300">يمكنك حفظ عرض السعر الحالي أو استدعاء وحذف عروض أسعار سابقة</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black tracking-tight font-display text-white">إدارة عروض الأسعار المحفوظة</h3>
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Cloud size={10} />
+                  <span>تخزين سحابي مباشر</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">يتم تخزين عروض الأسعار في قاعدة بيانات الموقع السحابية للاسترجاع الفوري من أي جهاز</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setIsRefreshing(true);
+                onRefresh();
+                setTimeout(() => setIsRefreshing(false), 800);
+              }}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+              title="تحديث عروض الأسعار من الموقع"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin text-[#FACC15]" : "text-slate-300"} />
+              <span className="hidden sm:inline">مزامنة سحابية</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body with scrollable area */}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check } from 'lucide-react';
+import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Image, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -107,6 +107,30 @@ export default function Header({
               <FileText size={14} className="text-white" />
               <span>عروض الأسعار {savedQuotesCount > 0 ? `(${savedQuotesCount})` : ''}</span>
             </button>
+
+            {/* Official Website Link Button */}
+            <a
+              href="https://almekawy-home-official.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-[#0F172A] font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-amber-950/20 group/btn border border-yellow-300/40"
+              title="الموقع الرسمي لشركة Al-mekawy Home"
+            >
+              <Globe size={14} className="text-[#0F172A]" />
+              <span>الموقع الرسمي لشركة Al-mekawy Home</span>
+            </a>
+
+            {/* Photos Website Link Button */}
+            <a
+              href="https://al-mekawy-home-upvc-photo.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-indigo-950/20 group/btn"
+              title="موقع صور المكاوي هوم للـ UPVC"
+            >
+              <Image size={14} className="text-white" />
+              <span>موقع الصور</span>
+            </a>
 
             {/* Developer Settings Trigger Button */}
             <button

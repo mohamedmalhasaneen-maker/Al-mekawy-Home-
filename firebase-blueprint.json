@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "Quote": {
+      "title": "Quote",
+      "description": "Saved customer quotation for Al-Mekawy Home UPVC windows & doors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the quote" },
+        "name": { "type": "string", "description": "Name/label of the saved quote" },
+        "customer": {
+          "type": "object",
+          "description": "Customer info",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" },
+            "address": { "type": "string" },
+            "notes": { "type": "string" }
+          }
+        },
+        "items": {
+          "type": "array",
+          "description": "List of window/door quote items",
+          "items": { "type": "object" }
+        },
+        "totalPrice": { "type": "number", "description": "Calculated total price in EGP" },
+        "discountPercentage": { "type": "number", "description": "Discount percentage applied" },
+        "date": { "type": "string", "description": "Formatted date string" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      },
+      "required": ["id", "name", "items", "totalPrice"]
+    }
+  },
+  "firestore": {
+    "/quotes/{quoteId}": {
+      "entity": "Quote",
+      "description": "Stored quotations for the company"
+    }
+  }
+}

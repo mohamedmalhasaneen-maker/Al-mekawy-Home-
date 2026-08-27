@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon, SavedQuote } from './types';
 import { PROFILES, ADDONS } from './constants';
 import { DevSettingsModal } from './components/DevSettingsModal';
+import { saveQuoteToCloud, fetchQuotesFromCloud, deleteQuoteFromCloud, subscribeToQuotes } from './firebase';
 
 import Header from './components/Header';
 import ItemCard from './components/ItemCard';
@@ -40,11 +41,25 @@ export default function App() {
     }
   });
 
-  const fetchQuotesFromServer = () => {
+  const fetchQuotesFromAllSources = async () => {
+    try {
+      const cloudQuotes = await fetchQuotesFromCloud();
+      if (cloudQuotes && cloudQuotes.length > 0) {
+        setSavedQuotes(cloudQuotes);
+        try {
+          localStorage.setItem('almekawy_saved_quotes', JSON.stringify(cloudQuotes));
+        } catch (e) {}
+        return;
+      }
+    } catch (err) {
+      console.warn("Cloud quotes fetch fallback:", err);
+    }
+
+    // Fallback to local server API if cloud is empty or during offline transitions
     fetch('/api/quotes')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setSavedQuotes(data);
           try {
             localStorage.setItem('almekawy_saved_quotes', JSON.stringify(data));
@@ -57,8 +72,29 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchQuotesFromServer();
+    // Initial fetch from cloud/server
+    fetchQuotesFromAllSources();
+
+    // Subscribe to real-time Firestore updates
+    const unsubscribe = subscribeToQuotes((liveQuotes) => {
+      if (liveQuotes && liveQuotes.length > 0) {
+        setSavedQuotes(liveQuotes);
+        try {
+          localStorage.setItem('almekawy_saved_quotes', JSON.stringify(liveQuotes));
+        } catch (e) {}
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (isSavedQuotesModalOpen) {
+      fetchQuotesFromAllSources();
+    }
+  }, [isSavedQuotesModalOpen]);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -163,11 +199,26 @@ export default function App() {
   };
 
   const removeItem = (id: number) => {
-    if (items.length > 1) {
-      setItems(items.filter(item => item.id !== id));
-    } else {
-      alert('يجب أن يحتوي العرض على بند واحد على الأقل.');
-    }
+    setItems(prev => {
+      const remaining = prev.filter(item => item.id !== id);
+      if (remaining.length === 0) {
+        // If all items removed, reset with 1 default window item
+        return [{
+          id: Date.now(),
+          title: 'شباك 1',
+          itemType: 'window',
+          width: 100,
+          height: 100,
+          profile: 'pensa',
+          opening: 'جرار',
+          innerType: 'double',
+          glassType: 'شفاف 6 مم',
+          addons: [],
+          quantity: 1
+        }];
+      }
+      return remaining;
+    });
   };
 
   const updateItem = (id: number, field: string, value: any) => {
@@ -343,7 +394,10 @@ export default function App() {
         }
       });
 
-      const singleItemTotal = (area * (profilePrice + addonsPrice)) + flatAddonsPrice;
+      let singleItemTotal = (area * (profilePrice + addonsPrice)) + flatAddonsPrice;
+      if (item.fixedPrice && item.fixedPrice > 0) {
+        singleItemTotal = item.fixedPrice;
+      }
       const itemTotal = singleItemTotal * qty;
       totalPrice += itemTotal;
 
@@ -384,6 +438,11 @@ export default function App() {
       console.error(e);
     }
 
+    // Save to Firebase Firestore Cloud
+    saveQuoteToCloud(newQuote).catch(err => {
+      console.warn("Firestore save fallback error:", err);
+    });
+
     // Save to the backend server
     fetch('/api/quotes', {
       method: 'POST',
@@ -396,7 +455,6 @@ export default function App() {
       .then(data => {
         if (data.success) {
           console.log("Successfully saved quote to backend server");
-          fetchQuotesFromServer();
         }
       })
       .catch(err => {
@@ -419,6 +477,11 @@ export default function App() {
       console.error(e);
     }
 
+    // Delete from Firebase Firestore Cloud
+    deleteQuoteFromCloud(id).catch(err => {
+      console.warn("Firestore delete fallback error:", err);
+    });
+
     // Delete from the backend server
     fetch(`/api/quotes/${id}`, {
       method: 'DELETE',
@@ -427,7 +490,6 @@ export default function App() {
       .then(data => {
         if (data.success) {
           console.log("Successfully deleted quote from backend server");
-          fetchQuotesFromServer();
         }
       })
       .catch(err => {
@@ -617,6 +679,7 @@ export default function App() {
               onDeleteQuote={handleDeleteQuote}
               currentCustomerName={customer.name}
               formatCurrency={formatCurrency}
+              onRefresh={fetchQuotesFromAllSources}
             />
           )}
         </AnimatePresence>
@@ -627,7 +690,7 @@ export default function App() {
               isOpen={isPasswordModalOpen}
               onClose={() => setIsPasswordModalOpen(false)}
               onSuccess={() => {
-                fetchQuotesFromServer();
+                fetchQuotesFromAllSources();
                 setIsPasswordModalOpen(false);
                 setIsSavedQuotesModalOpen(true);
               }}

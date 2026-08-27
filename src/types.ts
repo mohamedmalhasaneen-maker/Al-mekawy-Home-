@@ -39,7 +39,7 @@ export interface Addon {
 export interface QuoteItem {
   id: number;
   title: string;
-  itemType: 'window' | 'door' | 'balcony';
+  itemType: 'window' | 'door' | 'balcony' | 'armored_door';
   width: number;
   height: number;
   profile: string;
@@ -49,6 +49,7 @@ export interface QuoteItem {
   hingePanes?: string;
   addons: string[];
   quantity?: number;
+  fixedPrice?: number;
 }
 
 export interface CalculatedItem extends QuoteItem {

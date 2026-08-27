@@ -600,7 +600,7 @@ ${discountStr}${notesStr}💰 *صافي القيمة النهائية:* *${forma
                           <div className="font-bold text-slate-900 text-xs sm:text-base flex flex-wrap items-center gap-1 sm:gap-2">
                             <span>{item.title}</span>
                             <span className="text-[9px] sm:text-[10px] font-black bg-slate-100 text-slate-700 px-1 sm:px-1.5 py-0.5 rounded print:bg-slate-200 shrink-0">
-                              {item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
+                              {item.itemType === 'armored_door' ? 'باب مصفح' : item.itemType === 'door' ? 'باب' : item.itemType === 'balcony' ? 'بلكونة' : 'شباك'}
                             </span>
                           </div>
                           <div className="text-[10px] sm:text-xs text-slate-400 mt-1">نظام الفتح: {item.opening}</div>

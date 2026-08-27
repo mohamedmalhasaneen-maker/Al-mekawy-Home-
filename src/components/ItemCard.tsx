@@ -220,7 +220,7 @@ const ItemCard: React.FC<Props> = ({ item, index, updateItem, removeItem, toggle
                 <button
                   type="button"
                   onClick={() => updateItem(item.id, 'itemType', 'door')}
-                  className={`flex-1 py-1.5 px-1.5 text-center rounded-lg font-black text-[10.5px] sm:text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
+                  className={`flex-1 py-1.5 px-2 text-center rounded-lg font-black text-xs transition-all cursor-pointer ${item.itemType === 'door' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:text-[#0F172A] text-slate-500 hover:bg-slate-50'}`}
                 >
                   باب
                 </button>
