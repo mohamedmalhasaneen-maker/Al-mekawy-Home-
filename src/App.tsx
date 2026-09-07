@@ -2,10 +2,19 @@ import { useState, useMemo, useEffect } from 'react';
 import { Plus, Calculator, QrCode, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon, SavedQuote } from './types';
+import { QuoteItem, CalculationResult, CustomerInfo, Profile, Addon, SavedQuote, SavedCustomer } from './types';
 import { PROFILES, ADDONS } from './constants';
 import { DevSettingsModal } from './components/DevSettingsModal';
-import { saveQuoteToCloud, fetchQuotesFromCloud, deleteQuoteFromCloud, subscribeToQuotes } from './firebase';
+import { 
+  saveQuoteToCloud, 
+  fetchQuotesFromCloud, 
+  deleteQuoteFromCloud, 
+  subscribeToQuotes,
+  saveCustomerToCloud,
+  fetchCustomersFromCloud,
+  deleteCustomerFromCloud,
+  subscribeToCustomers 
+} from './firebase';
 
 import Header from './components/Header';
 import ItemCard from './components/ItemCard';
@@ -16,6 +25,7 @@ import PricingTable from './components/PricingTable';
 import Features from './components/Features';
 import QrModal from './components/QrModal';
 import SavedQuotesModal from './components/SavedQuotesModal';
+import CustomersModal from './components/CustomersModal';
 import PasswordModal from './components/PasswordModal';
 import AiMekawyChat from './components/AiMekawyChat';
 
@@ -29,8 +39,18 @@ export default function App() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
   const [isSavedQuotesModalOpen, setIsSavedQuotesModalOpen] = useState(false);
+  const [isCustomersModalOpen, setIsCustomersModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [activeMainTab, setActiveMainTab] = useState<'input' | 'quote'>('input');
+
+  const [savedCustomers, setSavedCustomers] = useState<SavedCustomer[]>(() => {
+    try {
+      const saved = localStorage.getItem('almekawy_saved_customers');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>(() => {
     try {
@@ -41,11 +61,59 @@ export default function App() {
     }
   });
 
+  const fetchCustomersFromAllSources = async () => {
+    try {
+      const cloudCust = await fetchCustomersFromCloud();
+      if (cloudCust && cloudCust.length > 0) {
+        setSavedCustomers(cloudCust);
+        try {
+          localStorage.setItem('almekawy_saved_customers', JSON.stringify(cloudCust));
+        } catch (e) {}
+        return;
+      }
+    } catch (err) {
+      console.warn("Cloud customers fetch fallback:", err);
+    }
+
+    fetch('/api/customers')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSavedCustomers(data);
+          try {
+            localStorage.setItem('almekawy_saved_customers', JSON.stringify(data));
+          } catch (e) {}
+        }
+      })
+      .catch(err => {
+        console.warn("Error loading customers from backend:", err);
+      });
+  };
+
+  const syncCustomersFromQuotesList = (quotes: SavedQuote[]) => {
+    if (!Array.isArray(quotes) || quotes.length === 0) return;
+    for (const q of quotes) {
+      if (q.customer && q.customer.name && q.customer.name.trim()) {
+        const custName = q.customer.name.trim();
+        const custPhone = (q.customer.phone || '').trim();
+        const custAddress = (q.customer.address || '').trim();
+        
+        // Auto-save to Firestore Cloud if not already present
+        saveCustomerToCloud({
+          name: custName,
+          phone: custPhone,
+          address: custAddress,
+        }).catch(() => {});
+      }
+    }
+  };
+
   const fetchQuotesFromAllSources = async () => {
     try {
       const cloudQuotes = await fetchQuotesFromCloud();
       if (cloudQuotes && cloudQuotes.length > 0) {
         setSavedQuotes(cloudQuotes);
+        syncCustomersFromQuotesList(cloudQuotes);
         try {
           localStorage.setItem('almekawy_saved_quotes', JSON.stringify(cloudQuotes));
         } catch (e) {}
@@ -61,6 +129,7 @@ export default function App() {
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
           setSavedQuotes(data);
+          syncCustomersFromQuotesList(data);
           try {
             localStorage.setItem('almekawy_saved_quotes', JSON.stringify(data));
           } catch (e) {}
@@ -72,21 +141,34 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Initial fetch from cloud/server
+    // Initial fetch from cloud/server for both quotes and customers
     fetchQuotesFromAllSources();
+    fetchCustomersFromAllSources();
 
-    // Subscribe to real-time Firestore updates
-    const unsubscribe = subscribeToQuotes((liveQuotes) => {
+    // Subscribe to real-time Firestore updates for quotes
+    const unsubscribeQuotes = subscribeToQuotes((liveQuotes) => {
       if (liveQuotes && liveQuotes.length > 0) {
         setSavedQuotes(liveQuotes);
+        syncCustomersFromQuotesList(liveQuotes);
         try {
           localStorage.setItem('almekawy_saved_quotes', JSON.stringify(liveQuotes));
         } catch (e) {}
       }
     });
 
+    // Subscribe to real-time Firestore updates for customers
+    const unsubscribeCustomers = subscribeToCustomers((liveCustomers) => {
+      if (liveCustomers && liveCustomers.length > 0) {
+        setSavedCustomers(liveCustomers);
+        try {
+          localStorage.setItem('almekawy_saved_customers', JSON.stringify(liveCustomers));
+        } catch (e) {}
+      }
+    });
+
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof unsubscribeQuotes === 'function') unsubscribeQuotes();
+      if (typeof unsubscribeCustomers === 'function') unsubscribeCustomers();
     };
   }, []);
 
@@ -95,6 +177,12 @@ export default function App() {
       fetchQuotesFromAllSources();
     }
   }, [isSavedQuotesModalOpen]);
+
+  useEffect(() => {
+    if (isCustomersModalOpen) {
+      fetchCustomersFromAllSources();
+    }
+  }, [isCustomersModalOpen]);
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -443,6 +531,15 @@ export default function App() {
       console.warn("Firestore save fallback error:", err);
     });
 
+    // Also automatically register or update customer in directory
+    if (customer.name?.trim()) {
+      handleSaveCustomer({
+        name: customer.name.trim(),
+        phone: (customer.phone || '').trim(),
+        address: (customer.address || '').trim(),
+      }).catch(err => console.warn("Auto customer save error:", err));
+    }
+
     // Save to the backend server
     fetch('/api/quotes', {
       method: 'POST',
@@ -460,6 +557,69 @@ export default function App() {
       .catch(err => {
         console.error("Error saving quote to backend server:", err);
       });
+  };
+
+  const handleSaveCustomer = async (data: { name: string; phone: string; address?: string; notes?: string }) => {
+    try {
+      const saved = await saveCustomerToCloud(data);
+      setSavedCustomers(prev => {
+        const filtered = prev.filter(c => c.id !== saved.id && c.phone !== saved.phone);
+        const updated = [saved, ...filtered];
+        try {
+          localStorage.setItem('almekawy_saved_customers', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      // Also persist to backend server
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saved),
+      }).catch(err => console.warn("Backend customer save fallback:", err));
+    } catch (error) {
+      console.error("Error saving customer:", error);
+      throw error;
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    try {
+      await deleteCustomerFromCloud(id);
+      setSavedCustomers(prev => {
+        const updated = prev.filter(c => c.id !== id);
+        try {
+          localStorage.setItem('almekawy_saved_customers', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      fetch(`/api/customers/${id}`, {
+        method: 'DELETE',
+      }).catch(err => console.warn("Backend customer delete fallback:", err));
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      throw error;
+    }
+  };
+
+  const handleSelectCustomer = (selected: SavedCustomer) => {
+    setCustomer(prev => ({
+      ...prev,
+      name: selected.name,
+      phone: selected.phone,
+      address: selected.address || prev.address,
+    }));
+    setActiveMainTab('input');
+  };
+
+  const handleSaveCustomerFromForm = async () => {
+    if (!customer.name?.trim() || !customer.phone?.trim()) return;
+    await handleSaveCustomer({
+      name: customer.name.trim(),
+      phone: customer.phone.trim(),
+      address: customer.address?.trim() || '',
+    });
   };
 
   const handleLoadQuote = (quote: SavedQuote) => {
@@ -527,6 +687,8 @@ export default function App() {
         savedQuotesCount={savedQuotes.length}
         onOpenSavedQuotes={() => setIsPasswordModalOpen(true)}
         onSaveQuoteAuto={handleSaveQuoteAuto}
+        customersCount={savedCustomers.length}
+        onOpenCustomers={() => setIsCustomersModalOpen(true)}
       />
 
       <main className="max-w-5xl mx-auto px-4 py-12">
@@ -573,7 +735,14 @@ export default function App() {
         <div className={activeMainTab === 'input' ? 'block' : 'hidden print:hidden'}>
           <PricingTable profiles={profiles} addons={addons} />
 
-          <CustomerForm customer={customer} onChange={handleCustomerChange} />
+          <CustomerForm 
+            customer={customer} 
+            onChange={handleCustomerChange} 
+            savedCustomers={savedCustomers}
+            onOpenCustomersModal={() => setIsCustomersModalOpen(true)}
+            onSaveCustomerToDirectory={handleSaveCustomerFromForm}
+            onSelectCustomer={handleSelectCustomer}
+          />
 
           <div className="space-y-8 print:hidden">
             <AnimatePresence mode="popLayout" initial={false}>
@@ -680,6 +849,20 @@ export default function App() {
               currentCustomerName={customer.name}
               formatCurrency={formatCurrency}
               onRefresh={fetchQuotesFromAllSources}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isCustomersModalOpen && (
+            <CustomersModal
+              isOpen={isCustomersModalOpen}
+              onClose={() => setIsCustomersModalOpen(false)}
+              customers={savedCustomers}
+              onSelectCustomer={handleSelectCustomer}
+              onSaveCustomer={handleSaveCustomer}
+              onDeleteCustomer={handleDeleteCustomer}
+              onRefresh={fetchCustomersFromAllSources}
             />
           )}
         </AnimatePresence>

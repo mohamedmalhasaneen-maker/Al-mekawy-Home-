@@ -69,6 +69,16 @@ export interface SavedQuote {
   totalPrice: number;
 }
 
+export interface SavedCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  address?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CalculationResult {
   itemsCalculated: CalculatedItem[];
   totalArea: number;

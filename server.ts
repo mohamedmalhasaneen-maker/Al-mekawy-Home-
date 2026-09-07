@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const QUOTES_FILE = path.join(process.cwd(), "saved_quotes.json");
+const CUSTOMERS_FILE = path.join(process.cwd(), "saved_customers.json");
 
 function readSavedQuotes(): any[] {
   try {
@@ -25,6 +26,26 @@ function writeSavedQuotes(quotes: any[]) {
     fs.writeFileSync(QUOTES_FILE, JSON.stringify(quotes, null, 2), "utf-8");
   } catch (err) {
     console.error("Error writing saved quotes:", err);
+  }
+}
+
+function readSavedCustomers(): any[] {
+  try {
+    if (fs.existsSync(CUSTOMERS_FILE)) {
+      const data = fs.readFileSync(CUSTOMERS_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error("Error reading saved customers:", err);
+  }
+  return [];
+}
+
+function writeSavedCustomers(customers: any[]) {
+  try {
+    fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify(customers, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing saved customers:", err);
   }
 }
 
@@ -50,6 +71,39 @@ async function startServer() {
       const filtered = quotes.filter((q: any) => q.id !== newQuote.id);
       const updated = [newQuote, ...filtered];
       writeSavedQuotes(updated);
+
+      // Automatically sync customer name and phone to customers directory
+      if (newQuote.customer && newQuote.customer.name && newQuote.customer.name.trim()) {
+        try {
+          const custName = newQuote.customer.name.trim();
+          const custPhone = (newQuote.customer.phone || '').trim();
+          const custAddress = (newQuote.customer.address || '').trim();
+          const customerId = custPhone 
+            ? `cust_${custPhone.replace(/[^0-9]/g, '')}` 
+            : `cust_${Buffer.from(custName).toString('hex').slice(0, 16)}`;
+          
+          const customerRecord = {
+            id: customerId,
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+            notes: '',
+            updatedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          };
+
+          const customers = readSavedCustomers();
+          const filteredCust = customers.filter((c: any) => 
+            c.id !== customerId && 
+            (!custPhone || c.phone !== custPhone) && 
+            c.name.toLowerCase() !== custName.toLowerCase()
+          );
+          writeSavedCustomers([customerRecord, ...filteredCust]);
+        } catch (custSyncErr) {
+          console.error("Auto customer sync error in server.ts:", custSyncErr);
+        }
+      }
+
       res.json({ success: true, quote: newQuote });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -62,6 +116,81 @@ async function startServer() {
       const quotes = readSavedQuotes();
       const updated = quotes.filter((q: any) => q.id !== id);
       writeSavedQuotes(updated);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Customers API Endpoints
+  app.get("/api/customers", (req, res) => {
+    let customers = readSavedCustomers();
+    // Auto sync any customers found inside existing saved quotes
+    try {
+      const quotes = readSavedQuotes();
+      let hasNewSync = false;
+      for (const q of quotes) {
+        if (q.customer && q.customer.name && q.customer.name.trim()) {
+          const name = q.customer.name.trim();
+          const phone = (q.customer.phone || '').trim();
+          const exists = customers.some((c: any) => 
+            c.name.toLowerCase() === name.toLowerCase() || 
+            (phone && c.phone === phone)
+          );
+          if (!exists) {
+            customers.push({
+              id: phone ? `cust_${phone.replace(/[^0-9]/g, '')}` : `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              name,
+              phone,
+              address: (q.customer.address || '').trim(),
+              notes: '',
+              createdAt: q.date || new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+            hasNewSync = true;
+          }
+        }
+      }
+      if (hasNewSync) {
+        writeSavedCustomers(customers);
+      }
+    } catch (e) {
+      console.warn("Quote to customer auto-sync on GET error:", e);
+    }
+
+    res.json(customers);
+  });
+
+  app.post("/api/customers", (req, res) => {
+    try {
+      const customer = req.body;
+      if (!customer || !customer.name) {
+        return res.status(400).json({ error: "اسم العميل مطلوب" });
+      }
+      const customerPhone = (customer.phone || '').trim();
+      const customerId = customer.id || `cust_${customerPhone.replace(/[^0-9]/g, '') || Date.now()}`;
+      const customerRecord = {
+        ...customer,
+        id: customerId,
+        phone: customerPhone,
+        updatedAt: new Date().toISOString()
+      };
+      const customers = readSavedCustomers();
+      const filtered = customers.filter((c: any) => c.id !== customerId && (!customerPhone || c.phone !== customerPhone));
+      const updated = [customerRecord, ...filtered];
+      writeSavedCustomers(updated);
+      res.json({ success: true, customer: customerRecord });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/customers/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const customers = readSavedCustomers();
+      const updated = customers.filter((c: any) => c.id !== id);
+      writeSavedCustomers(updated);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

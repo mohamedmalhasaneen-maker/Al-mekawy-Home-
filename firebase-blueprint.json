@@ -29,12 +29,31 @@
         "updatedAt": { "type": "string", "description": "Update timestamp" }
       },
       "required": ["id", "name", "items", "totalPrice"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Saved customer profile for quick access and reuse across quotes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique customer ID" },
+        "name": { "type": "string", "description": "Customer full name" },
+        "phone": { "type": "string", "description": "Customer primary contact phone" },
+        "address": { "type": "string", "description": "Customer location or project site address" },
+        "notes": { "type": "string", "description": "General customer notes or preferences" },
+        "createdAt": { "type": "string", "description": "Registration date timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "name", "phone"]
     }
   },
   "firestore": {
     "/quotes/{quoteId}": {
       "entity": "Quote",
       "description": "Stored quotations for the company"
+    },
+    "/customers/{customerId}": {
+      "entity": "Customer",
+      "description": "Registered customer profiles directory"
     }
   }
 }

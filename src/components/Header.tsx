@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Globe } from 'lucide-react';
+import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Globe, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -22,6 +22,8 @@ interface HeaderProps {
   savedQuotesCount: number;
   onOpenSavedQuotes: () => void;
   onSaveQuoteAuto: () => void;
+  customersCount?: number;
+  onOpenCustomers?: () => void;
 }
 
 export default function Header({ 
@@ -30,7 +32,9 @@ export default function Header({
   onToggleTheme, 
   savedQuotesCount, 
   onOpenSavedQuotes,
-  onSaveQuoteAuto
+  onSaveQuoteAuto,
+  customersCount,
+  onOpenCustomers
 }: HeaderProps) {
   const [justSaved, setJustSaved] = useState(false);
 
@@ -107,6 +111,19 @@ export default function Header({
               <FileText size={14} className="text-white" />
               <span>عروض الأسعار {savedQuotesCount > 0 ? `(${savedQuotesCount})` : ''}</span>
             </button>
+
+            {/* Registered Customers Directory Button */}
+            {onOpenCustomers && (
+              <button
+                type="button"
+                onClick={onOpenCustomers}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-emerald-950/20 group/btn"
+                title="عرض وإدارة قائمة العملاء المسجلين في قاعدة البيانات السحابية"
+              >
+                <Users size={14} className="text-[#FACC15]" />
+                <span>دليل العملاء {typeof customersCount === 'number' && customersCount > 0 ? `(${customersCount})` : ''}</span>
+              </button>
+            )}
 
             {/* Official Website Link Button */}
             <a

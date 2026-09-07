@@ -152,6 +152,11 @@ export default function SavedQuotesModal({
                 <span>{saveSuccess ? 'تم الحفظ بنجاح!' : 'حفظ العرض الحالي'}</span>
               </button>
             </form>
+
+            <div className="flex items-center gap-2 text-xs text-slate-500 pt-1 font-medium bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>ميزة تلقائية: يتم حفظ اسم العميل ورقم هاتفه تلقائياً في <strong>دليل العملاء</strong> عند حفظ أي عرض سعر.</span>
+            </div>
           </div>
 
           {/* Section: List of Saved Quotes */}
