@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Globe, Users } from 'lucide-react';
+import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Globe, Users, Images } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
@@ -135,6 +135,18 @@ export default function Header({
             >
               <Globe size={14} className="text-[#0F172A]" />
               <span>الموقع الرسمي لشركة Al-mekawy Home</span>
+            </a>
+
+            {/* Photo Gallery Link Button */}
+            <a
+              href="https://al-mekawy-home-upvc-photo.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-blue-950/20 group/btn border border-indigo-400/30"
+              title="معرض الصور وأعمال شركة Al-mekawy Home"
+            >
+              <Images size={14} className="text-[#FACC15]" />
+              <span>معرض الصور</span>
             </a>
 
             {/* Developer Settings Trigger Button */}
