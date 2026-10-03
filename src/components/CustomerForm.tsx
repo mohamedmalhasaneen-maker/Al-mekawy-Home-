@@ -112,59 +112,9 @@ export default function CustomerForm({
           </p>
         </div>
 
-        {/* Action Buttons: Directory & Save to Cloud */}
+        {/* Action Status Badge */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Open Registered Customers Modal Button */}
-          {onOpenCustomersModal && (
-            <button
-              type="button"
-              onClick={onOpenCustomersModal}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-[#0F172A] text-slate-800 hover:text-[#FACC15] rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border border-slate-200 hover:border-slate-800 shadow-sm active:scale-95 group"
-              title="عرض دليل العملاء المسجلين"
-            >
-              <Users size={15} className="text-[#0F172A] group-hover:text-[#FACC15]" />
-              <span>قائمة العملاء المسجلين</span>
-              <span className="bg-[#0F172A] group-hover:bg-[#FACC15] text-[#FACC15] group-hover:text-[#0F172A] text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                {savedCustomers.length}
-              </span>
-            </button>
-          )}
-
-          {/* Save Current Customer to Cloud Button */}
-          {onSaveCustomerToDirectory && (
-            <button
-              type="button"
-              onClick={handleSaveCustomer}
-              disabled={!canSaveCustomer || isSaving}
-              className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 ${
-                saveSuccess
-                  ? 'bg-emerald-600 text-white shadow-emerald-600/20'
-                  : canSaveCustomer
-                  ? 'bg-[#0F172A] hover:bg-slate-800 text-[#FACC15]'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-              }`}
-              title={canSaveCustomer ? "حفظ بيانات هذا العميل في قاعدة بيانات Firestore" : "أدخل الاسم ورقم الهاتف أولاً لحفظ العميل"}
-            >
-              {saveSuccess ? (
-                <>
-                  <Check size={14} className="text-white" />
-                  <span>تم حفظ العميل!</span>
-                </>
-              ) : isSaving ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-[#FACC15] border-t-transparent rounded-full animate-spin" />
-                  <span>جاري الحفظ...</span>
-                </>
-              ) : (
-                <>
-                  <BookmarkCheck size={15} />
-                  <span>حفظ العميل في الدليل</span>
-                </>
-              )}
-            </button>
-          )}
-
-          <div className="hidden sm:flex items-center gap-1.5 py-1 px-3 bg-green-50 text-green-700 rounded-full text-xs font-black">
+          <div className="hidden sm:flex items-center gap-1.5 py-1.5 px-3.5 bg-green-50 text-green-700 rounded-full text-xs font-black border border-green-200">
             <CheckCircle2 size={14} />
             جاهز للطباعة بالتفاصيل
           </div>

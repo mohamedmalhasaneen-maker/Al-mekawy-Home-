@@ -40,7 +40,7 @@ export default function App() {
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
   const [isSavedQuotesModalOpen, setIsSavedQuotesModalOpen] = useState(false);
   const [isCustomersModalOpen, setIsCustomersModalOpen] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<'quotes' | 'customers' | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<'input' | 'quote'>('input');
 
   const [savedCustomers, setSavedCustomers] = useState<SavedCustomer[]>(() => {
@@ -685,10 +685,10 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         savedQuotesCount={savedQuotes.length}
-        onOpenSavedQuotes={() => setIsPasswordModalOpen(true)}
+        onOpenSavedQuotes={() => setPasswordTarget('quotes')}
         onSaveQuoteAuto={handleSaveQuoteAuto}
         customersCount={savedCustomers.length}
-        onOpenCustomers={() => setIsCustomersModalOpen(true)}
+        onOpenCustomers={() => setPasswordTarget('customers')}
       />
 
       <main className="max-w-5xl mx-auto px-4 py-12">
@@ -739,7 +739,7 @@ export default function App() {
             customer={customer} 
             onChange={handleCustomerChange} 
             savedCustomers={savedCustomers}
-            onOpenCustomersModal={() => setIsCustomersModalOpen(true)}
+            onOpenCustomersModal={() => setPasswordTarget('customers')}
             onSaveCustomerToDirectory={handleSaveCustomerFromForm}
             onSelectCustomer={handleSelectCustomer}
           />
@@ -868,14 +868,20 @@ export default function App() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {isPasswordModalOpen && (
+          {passwordTarget && (
             <PasswordModal
-              isOpen={isPasswordModalOpen}
-              onClose={() => setIsPasswordModalOpen(false)}
+              isOpen={Boolean(passwordTarget)}
+              onClose={() => setPasswordTarget(null)}
               onSuccess={() => {
-                fetchQuotesFromAllSources();
-                setIsPasswordModalOpen(false);
-                setIsSavedQuotesModalOpen(true);
+                const target = passwordTarget;
+                setPasswordTarget(null);
+                if (target === 'quotes') {
+                  fetchQuotesFromAllSources();
+                  setIsSavedQuotesModalOpen(true);
+                } else if (target === 'customers') {
+                  fetchCustomersFromAllSources();
+                  setIsCustomersModalOpen(true);
+                }
               }}
               requiredPassword="662006"
             />

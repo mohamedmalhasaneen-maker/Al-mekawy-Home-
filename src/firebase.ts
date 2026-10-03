@@ -164,11 +164,11 @@ export async function saveCustomerToCloud(customer: Partial<SavedCustomer> & { n
     const trimmedPhone = (customer.phone || '').trim();
     const cleanDigits = trimmedPhone.replace(/[^0-9]/g, '');
     
-    // Normalize clean ID: use existing id, clean phone digits, or name slug + timestamp
+    // Normalize clean ID: use existing id, clean phone digits, or stable name slug (NO timestamp!)
     const customerId = customer.id || (
       cleanDigits.length >= 7 
         ? `cust_${cleanDigits}` 
-        : `cust_${encodeURIComponent(trimmedName.replace(/\s+/g, '_')).slice(0, 30)}_${Date.now()}`
+        : `cust_name_${encodeURIComponent(trimmedName.toLowerCase().replace(/\s+/g, '_')).slice(0, 30)}`
     );
     const nowIso = new Date().toISOString();
 
@@ -194,6 +194,37 @@ export async function saveCustomerToCloud(customer: Partial<SavedCustomer> & { n
     console.error('[Firestore] Error saving customer to cloud:', error);
     throw error;
   }
+}
+
+function deduplicateCustomers(list: SavedCustomer[]): SavedCustomer[] {
+  const map = new Map<string, SavedCustomer>();
+  for (const c of list) {
+    const cleanDigits = (c.phone || '').replace(/[^0-9]/g, '');
+    const key = cleanDigits.length >= 7 ? `phone_${cleanDigits}` : `name_${c.name.trim().toLowerCase()}`;
+    if (!map.has(key)) {
+      map.set(key, c);
+    } else {
+      const existing = map.get(key)!;
+      const existingTime = new Date(existing.updatedAt || 0).getTime();
+      const currentTime = new Date(c.updatedAt || 0).getTime();
+      if (currentTime >= existingTime) {
+        map.set(key, {
+          ...c,
+          address: c.address || existing.address,
+          notes: c.notes || existing.notes,
+        });
+      } else {
+        map.set(key, {
+          ...existing,
+          address: existing.address || c.address,
+          notes: existing.notes || c.notes,
+        });
+      }
+    }
+  }
+  const result = Array.from(map.values());
+  result.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  return result;
 }
 
 /**
@@ -223,7 +254,7 @@ export async function fetchCustomersFromCloud(): Promise<SavedCustomer[]> {
       }
     });
 
-    return customers;
+    return deduplicateCustomers(customers);
   } catch (error) {
     console.error('[Firestore] Error fetching customers from cloud:', error);
     return [];
@@ -266,9 +297,8 @@ export function subscribeToCustomers(onUpdate: (customers: SavedCustomer[]) => v
           });
         }
       });
-      // Sort newest updated first
-      customers.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-      onUpdate(customers);
+      const uniqueCustomers = deduplicateCustomers(customers);
+      onUpdate(uniqueCustomers);
     }, (err) => {
       console.warn('[Firestore] Customers realtime subscription issue:', err);
     });
