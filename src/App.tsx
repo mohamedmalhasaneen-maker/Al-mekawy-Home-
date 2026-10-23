@@ -29,6 +29,7 @@ import SavedQuotesModal from './components/SavedQuotesModal';
 import CustomersModal from './components/CustomersModal';
 import PasswordModal from './components/PasswordModal';
 import AiMekawyChat from './components/AiMekawyChat';
+import { MobileView } from './components/mobile/MobileView';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', { 
@@ -297,6 +298,17 @@ export default function App() {
         quantity: 1
       }
     ]);
+  };
+
+  const handleDuplicateItem = (itemToDuplicate: QuoteItem) => {
+    setActiveMainTab('input');
+    const newId = Date.now();
+    const newItem: QuoteItem = {
+      ...itemToDuplicate,
+      id: newId,
+      title: `${itemToDuplicate.title} (نسخة)`,
+    };
+    setItems(prev => [...prev, newItem]);
   };
 
   const removeItem = (id: number) => {
@@ -698,238 +710,252 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'dark-mode' : ''} bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-105 selection:bg-yellow-200 selection:text-[#0F172A] pb-24 md:pb-0 transition-colors duration-300`} dir="rtl">
-      <Header 
-        onOpenDevSettings={() => setIsDevModalOpen(true)} 
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark-mode' : ''} bg-[#F8F9FA] text-[#1A1A1A] font-sans selection:bg-yellow-200 selection:text-[#0F172A] transition-colors duration-300`} dir="rtl">
+      {/* 1. Ground-up Mobile-Dedicated View (Mobile Only < md) */}
+      <MobileView
+        customer={customer}
+        items={items}
+        calculations={calculations}
+        profiles={profiles}
+        addons={addons}
+        savedQuotes={savedQuotes}
+        savedCustomers={savedCustomers}
         theme={theme}
         onToggleTheme={toggleTheme}
-        savedQuotesCount={savedQuotes.length}
+        handleCustomerChange={handleCustomerChange}
+        updateItem={updateItem}
+        removeItem={removeItem}
+        addNewItem={addNewItem}
+        toggleAddon={toggleAddon}
+        handleSaveQuoteAuto={handleSaveQuoteAuto}
+        handleSaveCurrentQuote={handleSaveCurrentQuote}
+        onOpenDevSettings={() => setIsDevModalOpen(true)}
         onOpenSavedQuotes={() => setPasswordTarget('quotes')}
-        onSaveQuoteAuto={handleSaveQuoteAuto}
-        customersCount={savedCustomers.length}
         onOpenCustomers={() => setPasswordTarget('customers')}
+        onOpenQr={() => setIsQrModalOpen(true)}
+        handlePrint={handlePrint}
+        activeMainTab={activeMainTab}
+        setActiveMainTab={setActiveMainTab}
+        formatCurrency={formatCurrency}
+        handleSelectCustomer={handleSelectCustomer}
+        handleSaveCustomerFromForm={handleSaveCustomerFromForm}
+        onDuplicateItem={handleDuplicateItem}
       />
 
-      <main className="max-w-5xl mx-auto px-4 py-12">
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl border-2 border-slate-200 border-r-8 border-r-[#0F172A] p-8 mb-12 print:hidden overflow-hidden relative shadow-sm"
-        >
-          <h2 className="text-2xl font-display font-black text-[#0F172A] mb-4 flex items-center gap-3">
-            <Calculator className="text-[#0F172A]" size={26} />
-            بوابة المكاوي هوم للتسعير التفاعلي
-          </h2>
-          <p className="text-slate-500 leading-relaxed text-base max-w-3xl">
-            أدخل مقاسات الفتحات لديك (العرض والارتفاع بالسنتيمتر)، ثم اختر نوع القطاع والإضافات التي ترغب بها لكل بند. سيقوم النظام تلقائياً بحساب المساحات (المتر المربع) وعرض التكلفة الإجمالية بدقة وبشفافية تامة.
-          </p>
-        </motion.div>
+      {/* 2. Desktop-Dedicated View (Unchanged Desktop Layout >= md) */}
+      <div className="hidden md:block pb-24 md:pb-0">
+        <Header 
+          onOpenDevSettings={() => setIsDevModalOpen(true)} 
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          savedQuotesCount={savedQuotes.length}
+          onOpenSavedQuotes={() => setPasswordTarget('quotes')}
+          onSaveQuoteAuto={handleSaveQuoteAuto}
+          customersCount={savedCustomers.length}
+          onOpenCustomers={() => setPasswordTarget('customers')}
+        />
 
-        {/* Navigation Tabs for adjacent pages view */}
-        <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-8 max-w-xl mx-auto border border-slate-200/80 print:hidden shadow-inner relative justify-between gap-1.5">
-          <button
-            onClick={() => setActiveMainTab('input')}
-            className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
-              activeMainTab === 'input'
-                ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
-                : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
-            }`}
+        <main className="max-w-5xl mx-auto px-4 py-12">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border-2 border-slate-200 border-r-8 border-r-[#0F172A] p-8 mb-12 print:hidden overflow-hidden relative shadow-sm"
           >
-            <Calculator size={18} />
-            <span>بيانات العميل وحساب البنود</span>
-          </button>
-          <button
-            onClick={() => setActiveMainTab('quote')}
-            className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
-              activeMainTab === 'quote'
-                ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
-                : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
-            }`}
-          >
-            <FileText size={18} />
-            <span>عرض السعر التفصيلي (PDF)</span>
-          </button>
-        </div>
+            <h2 className="text-2xl font-display font-black text-[#0F172A] mb-4 flex items-center gap-3">
+              <Calculator className="text-[#0F172A]" size={26} />
+              بوابة المكاوي هوم للتسعير التفاعلي
+            </h2>
+            <p className="text-slate-500 leading-relaxed text-base max-w-3xl">
+              أدخل مقاسات الفتحات لديك (العرض والارتفاع بالسنتيمتر)، ثم اختر نوع القطاع والإضافات التي ترغب بها لكل بند. سيقوم النظام تلقائياً بحساب المساحات (المتر المربع) وعرض التكلفة الإجمالية بدقة وبشفافية تامة.
+            </p>
+          </motion.div>
 
-        <div className={activeMainTab === 'input' ? 'block' : 'hidden print:hidden'}>
-          <PricingTable profiles={profiles} addons={addons} />
-
-          <CustomerForm 
-            customer={customer} 
-            onChange={handleCustomerChange} 
-            savedCustomers={savedCustomers}
-            onOpenCustomersModal={() => setPasswordTarget('customers')}
-            onSaveCustomerToDirectory={handleSaveCustomerFromForm}
-            onSelectCustomer={handleSelectCustomer}
-          />
-
-          <div className="space-y-8 print:hidden">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {calculations.itemsCalculated.map((item, index) => (
-                <ItemCard 
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  updateItem={updateItem}
-                  removeItem={removeItem}
-                  toggleAddon={toggleAddon}
-                  formatCurrency={formatCurrency}
-                  profiles={profiles}
-                  addons={addons}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-
-          <div className="mt-10 flex justify-center print:hidden">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={addNewItem}
-              className="hidden md:flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
-            >
-              <Plus size={28} />
-              إضافة بند جديد (شباك / باب)
-            </motion.button>
-          </div>
-
-          <SummaryBox 
-            calculations={calculations}
-            customer={customer}
-            onChange={handleCustomerChange}
-            formatCurrency={formatCurrency}
-            handlePrint={handlePrint}
-          />
-        </div>
-
-        <div className={activeMainTab === 'quote' ? 'block' : 'hidden print:block'}>
-          <DetailedQuoteView 
-            customer={customer}
-            calculations={calculations}
-            formatCurrency={formatCurrency}
-            profiles={profiles}
-            addons={addons}
-          />
-        </div>
-
-        <div className="print:hidden">
-          <Features />
-        </div>
-
-        <footer className="mt-20 text-center text-slate-400 text-sm print:hidden border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <p className="font-extrabold tracking-wide text-xs text-slate-400">© {new Date().getFullYear()} AL-MAKKAWI HOME • ALL RIGHTS RESERVED</p>
+          {/* Navigation Tabs for adjacent pages view */}
+          <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-8 max-w-xl mx-auto border border-slate-200/80 print:hidden shadow-inner relative justify-between gap-1.5">
             <button
-              type="button"
-              onClick={() => setIsQrModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[#0F172A]/5 hover:bg-[#FACC15] hover:text-[#0F172A] text-[#0F172A] border border-slate-200 hover:border-transparent transition-all duration-200 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm hover:shadow active:scale-95 cursor-pointer"
+              onClick={() => setActiveMainTab('input')}
+              className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
+                activeMainTab === 'input'
+                  ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
+                  : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
+              }`}
             >
-              <QrCode size={13} />
-              <span>رمز الاستجابة السريعة (QR)</span>
+              <Calculator size={18} />
+              <span>بيانات العميل وحساب البنود</span>
+            </button>
+            <button
+              onClick={() => setActiveMainTab('quote')}
+              className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
+                activeMainTab === 'quote'
+                  ? 'bg-[#0F172A] text-[#FACC15] shadow-md shadow-slate-900/10'
+                  : 'text-slate-600 hover:text-[#0F172A] hover:bg-slate-200'
+              }`}
+            >
+              <FileText size={18} />
+              <span>عرض السعر التفصيلي (PDF)</span>
             </button>
           </div>
-          <div className="flex gap-4 text-xs font-black uppercase text-[#0F172A]">
-            <span>خامات معتمدة</span>
-            <span>•</span>
-            <span>تركيب احترافي</span>
-            <span>•</span>
-            <span>معاينة مجانية</span>
+
+          <div className={activeMainTab === 'input' ? 'block' : 'hidden print:hidden'}>
+            <PricingTable profiles={profiles} addons={addons} />
+
+            <CustomerForm 
+              customer={customer} 
+              onChange={handleCustomerChange} 
+              savedCustomers={savedCustomers}
+              onOpenCustomersModal={() => setPasswordTarget('customers')}
+              onSaveCustomerToDirectory={handleSaveCustomerFromForm}
+              onSelectCustomer={handleSelectCustomer}
+            />
+
+            <div className="space-y-8 print:hidden">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {calculations.itemsCalculated.map((item, index) => (
+                  <ItemCard 
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    updateItem={updateItem}
+                    removeItem={removeItem}
+                    toggleAddon={toggleAddon}
+                    formatCurrency={formatCurrency}
+                    profiles={profiles}
+                    addons={addons}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+
+            <div className="mt-10 flex justify-center print:hidden">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={addNewItem}
+                className="hidden md:flex items-center gap-3 bg-[#0F172A] hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xl shadow-lg transition-all w-full md:w-auto justify-center cursor-pointer"
+              >
+                <Plus size={28} />
+                إضافة بند جديد (شباك / باب)
+              </motion.button>
+            </div>
+
+            <SummaryBox 
+              calculations={calculations}
+              customer={customer}
+              onChange={handleCustomerChange}
+              formatCurrency={formatCurrency}
+              handlePrint={handlePrint}
+            />
           </div>
-        </footer>
 
-        <AnimatePresence>
-          {isQrModalOpen && (
-            <QrModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {isDevModalOpen && (
-            <DevSettingsModal
-              isOpen={isDevModalOpen}
-              onClose={() => setIsDevModalOpen(false)}
+          <div className={activeMainTab === 'quote' ? 'block' : 'hidden print:block'}>
+            <DetailedQuoteView 
+              customer={customer}
+              calculations={calculations}
+              formatCurrency={formatCurrency}
               profiles={profiles}
               addons={addons}
-              onSavePrices={handleSavePrices}
-              onResetPrices={handleResetPrices}
             />
-          )}
-        </AnimatePresence>
+          </div>
 
-        <AnimatePresence>
-          {isSavedQuotesModalOpen && (
-            <SavedQuotesModal
-              isOpen={isSavedQuotesModalOpen}
-              onClose={() => setIsSavedQuotesModalOpen(false)}
-              savedQuotes={savedQuotes}
-              onSaveCurrent={handleSaveCurrentQuote}
-              onLoadQuote={handleLoadQuote}
-              onDeleteQuote={handleDeleteQuote}
-              currentCustomerName={customer.name}
-              formatCurrency={formatCurrency}
-              onRefresh={fetchQuotesFromAllSources}
-            />
-          )}
-        </AnimatePresence>
+          <div className="print:hidden">
+            <Features />
+          </div>
 
-        <AnimatePresence>
-          {isCustomersModalOpen && (
-            <CustomersModal
-              isOpen={isCustomersModalOpen}
-              onClose={() => setIsCustomersModalOpen(false)}
-              customers={savedCustomers}
-              onSelectCustomer={handleSelectCustomer}
-              onSaveCustomer={handleSaveCustomer}
-              onDeleteCustomer={handleDeleteCustomer}
-              onRefresh={fetchCustomersFromAllSources}
-            />
-          )}
-        </AnimatePresence>
+          <footer className="mt-20 text-center text-slate-400 text-sm print:hidden border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <p className="font-extrabold tracking-wide text-xs text-slate-400">© {new Date().getFullYear()} AL-MAKKAWI HOME • ALL RIGHTS RESERVED</p>
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(true)}
+                className="px-3.5 py-1.5 bg-[#0F172A]/5 hover:bg-[#FACC15] hover:text-[#0F172A] text-[#0F172A] border border-slate-200 hover:border-transparent transition-all duration-200 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm hover:shadow active:scale-95 cursor-pointer"
+              >
+                <QrCode size={13} />
+                <span>رمز الاستجابة السريعة (QR)</span>
+              </button>
+            </div>
+            <div className="flex gap-4 text-xs font-black uppercase text-[#0F172A]">
+              <span>خامات معتمدة</span>
+              <span>•</span>
+              <span>تركيب احترافي</span>
+              <span>•</span>
+              <span>معاينة مجانية</span>
+            </div>
+          </footer>
+        </main>
+      </div>
 
-        <AnimatePresence>
-          {passwordTarget && (
-            <PasswordModal
-              isOpen={Boolean(passwordTarget)}
-              onClose={() => setPasswordTarget(null)}
-              onSuccess={() => {
-                const target = passwordTarget;
-                setPasswordTarget(null);
-                if (target === 'quotes') {
-                  fetchQuotesFromAllSources();
-                  setIsSavedQuotesModalOpen(true);
-                } else if (target === 'customers') {
-                  fetchCustomersFromAllSources();
-                  setIsCustomersModalOpen(true);
-                }
-              }}
-              requiredPassword="662006"
-            />
-          )}
-        </AnimatePresence>
+      {/* Shared Dialog Modals across Mobile and Desktop */}
+      <AnimatePresence>
+        {isQrModalOpen && (
+          <QrModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} />
+        )}
+      </AnimatePresence>
 
-        <AiMekawyChat />
+      <AnimatePresence>
+        {isDevModalOpen && (
+          <DevSettingsModal
+            isOpen={isDevModalOpen}
+            onClose={() => setIsDevModalOpen(false)}
+            profiles={profiles}
+            addons={addons}
+            onSavePrices={handleSavePrices}
+            onResetPrices={handleResetPrices}
+          />
+        )}
+      </AnimatePresence>
 
-        {/* Mobile Sticky Bottom Navigation Bar for easy one-handed use */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] z-40 flex items-center gap-3 md:hidden print:hidden">
-          <button
-            type="button"
-            onClick={addNewItem}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#0F172A] hover:bg-black text-white py-4 rounded-2xl font-black text-base shadow-lg active:scale-95 transition-all text-center cursor-pointer"
-          >
-            <Plus size={20} />
-            <span>إضافة بند جديد</span>
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-5 py-4 bg-amber-500 hover:bg-amber-600 text-[#0F172A] rounded-2xl font-black text-sm shadow-md active:scale-95 transition-all text-center cursor-pointer flex items-center gap-1.5"
-            title="معاينة وتحميل ملف PDF منظم"
-          >
-            <FileText size={20} />
-            <span>عرض السعر (PDF)</span>
-          </button>
-        </div>
-      </main>
+      <AnimatePresence>
+        {isSavedQuotesModalOpen && (
+          <SavedQuotesModal
+            isOpen={isSavedQuotesModalOpen}
+            onClose={() => setIsSavedQuotesModalOpen(false)}
+            savedQuotes={savedQuotes}
+            onSaveCurrent={handleSaveCurrentQuote}
+            onLoadQuote={handleLoadQuote}
+            onDeleteQuote={handleDeleteQuote}
+            currentCustomerName={customer.name}
+            formatCurrency={formatCurrency}
+            onRefresh={fetchQuotesFromAllSources}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isCustomersModalOpen && (
+          <CustomersModal
+            isOpen={isCustomersModalOpen}
+            onClose={() => setIsCustomersModalOpen(false)}
+            customers={savedCustomers}
+            onSelectCustomer={handleSelectCustomer}
+            onSaveCustomer={handleSaveCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
+            onRefresh={fetchCustomersFromAllSources}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {passwordTarget && (
+          <PasswordModal
+            isOpen={Boolean(passwordTarget)}
+            onClose={() => setPasswordTarget(null)}
+            onSuccess={() => {
+              const target = passwordTarget;
+              setPasswordTarget(null);
+              if (target === 'quotes') {
+                fetchQuotesFromAllSources();
+                setIsSavedQuotesModalOpen(true);
+              } else if (target === 'customers') {
+                fetchCustomersFromAllSources();
+                setIsCustomersModalOpen(true);
+              }
+            }}
+            requiredPassword="662006"
+          />
+        )}
+      </AnimatePresence>
+
+      <AiMekawyChat />
 
       <style dangerouslySetInnerHTML={{__html: `
         @media print {

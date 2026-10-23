@@ -333,6 +333,49 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
 
 export default function DetailedQuoteView({ customer, calculations, formatCurrency, profiles, addons }: Props) {
   const [isExporting, setIsExporting] = React.useState(false);
+  const previewWrapperRef = React.useRef<HTMLDivElement>(null);
+  const sheetRef = React.useRef<HTMLDivElement>(null);
+  const [scaleRatio, setScaleRatio] = React.useState<number>(1);
+  const [rawHeight, setRawHeight] = React.useState<number>(0);
+
+  const TARGET_SHEET_WIDTH = 768;
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      if (previewWrapperRef.current && sheetRef.current) {
+        const availableW = previewWrapperRef.current.clientWidth;
+        const currentRawH = sheetRef.current.offsetHeight;
+        setRawHeight(currentRawH);
+
+        if (availableW > 0 && availableW < TARGET_SHEET_WIDTH) {
+          const ratio = availableW / TARGET_SHEET_WIDTH;
+          setScaleRatio(ratio);
+        } else {
+          setScaleRatio(1);
+        }
+      }
+    };
+
+    handleResize();
+
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    if (previewWrapperRef.current) {
+      resizeObserver.observe(previewWrapperRef.current);
+    }
+    if (sheetRef.current) {
+      resizeObserver.observe(sheetRef.current);
+    }
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [calculations, customer]);
+
   const quoteNumber = React.useMemo(() => {
     const today = new Date();
     const random = Math.floor(100 + Math.random() * 900);
@@ -459,27 +502,27 @@ ${discountStr}${notesStr}💰 *صافي القيمة النهائية:* *${forma
   };
 
   return (
-    <div id="detailed-quote-view" className="mt-16 bg-white border-2 border-slate-300 rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none print:mt-0 print:p-0">
+    <div id="detailed-quote-view" className="-mx-3 -mt-3 sm:mx-0 sm:mt-8 bg-white border-0 sm:border-2 border-slate-300 rounded-none sm:rounded-3xl overflow-hidden shadow-sm hover:border-[#FACC15] transition-all duration-300 print:border-none print:shadow-none print:rounded-none print:mt-0 print:p-0">
       
       {/* Visual Indicator of Quotation Form */}
-      <div className="bg-[#0F172A] text-white p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b-4 border-[#FACC15] print:hidden">
+      <div className="bg-[#0F172A] text-white p-3.5 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b-4 border-[#FACC15] print:hidden">
         <div>
-          <span className="bg-[#FACC15] text-[#0F172A] px-2.5 py-1 rounded text-xs font-black uppercase tracking-wider mb-2 inline-block">
+          <span className="bg-[#FACC15] text-[#0F172A] px-2.5 py-1 rounded text-xs font-black uppercase tracking-wider mb-1.5 inline-block">
             معاينة حية للمستند الرسمي
           </span>
-          <h2 className="text-2xl sm:text-3xl font-display font-black text-white flex items-center gap-3">
-            <FileText size={26} className="text-[#FACC15]" />
+          <h2 className="text-lg sm:text-3xl font-display font-black text-white flex items-center gap-2.5">
+            <FileText size={20} className="text-[#FACC15]" />
             عرض السعر التفصيلي للعميل
           </h2>
-          <p className="text-slate-400 text-sm mt-1">
-            هذا هو الشكل النهائي لعرض السعر الذي سيتم طباعته أو حفظه كـ PDF ليُقدّم للعميل المحترم بصورة رسمية.
+          <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
+            عرض متكامل يتناسب تلقائياً مع شاشة الهاتف لعرض كافة البيانات بوضوح وسلاسة كاملة.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 shrink-0 self-start lg:self-center w-full sm:w-auto">
           <button
             onClick={exportToPdf}
             disabled={isExporting}
-            className="bg-[#FACC15] hover:bg-yellow-400 text-[#0F172A] px-6 py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition duration-200 active:scale-95 cursor-pointer disabled:opacity-60"
+            className="bg-[#FACC15] hover:bg-yellow-400 text-[#0F172A] px-5 py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition duration-200 active:scale-95 cursor-pointer disabled:opacity-60"
           >
             {isExporting ? (
               <>
@@ -496,12 +539,24 @@ ${discountStr}${notesStr}💰 *صافي القيمة النهائية:* *${forma
         </div>
       </div>
 
-      {/* Scrollable container to maintain desktop-grade layout stability and gorgeous rendering scale on mobile devices */}
-      <div className="overflow-x-auto w-full print:overflow-visible">
+      {/* Auto-fitting Container for Mobile & Desktop (Natural vertical scrolling with zero horizontal overflow) */}
+      <div 
+        ref={previewWrapperRef}
+        className="w-full overflow-x-hidden bg-slate-100/90 p-0 sm:p-4 sm:rounded-b-3xl flex justify-center print:bg-white print:p-0"
+      >
         {/* Actual Statement Sheet Area */}
         <div 
-          className="p-4 sm:p-8 md:p-10 bg-white text-slate-900 print:p-0 w-full max-w-5xl mx-auto" 
+          ref={sheetRef}
+          className="p-3.5 sm:p-8 md:p-10 bg-white text-slate-900 print:p-0 shadow-md sm:rounded-2xl border-x-0 sm:border border-slate-200 transition-transform duration-200 ease-out" 
           id="quotation-print-sheet"
+          style={{
+            width: scaleRatio < 1 ? `${TARGET_SHEET_WIDTH}px` : '100%',
+            maxWidth: `${TARGET_SHEET_WIDTH}px`,
+            transform: scaleRatio < 1 ? `scale(${scaleRatio})` : 'none',
+            transformOrigin: 'top center',
+            marginBottom: scaleRatio < 1 && rawHeight > 0 ? `${-1 * (rawHeight * (1 - scaleRatio))}px` : '0px',
+            flexShrink: 0
+          }}
         >
           
           {/* Document Header (For print as well) */}
