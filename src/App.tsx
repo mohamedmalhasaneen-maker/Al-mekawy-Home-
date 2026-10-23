@@ -13,7 +13,8 @@ import {
   saveCustomerToCloud,
   fetchCustomersFromCloud,
   deleteCustomerFromCloud,
-  subscribeToCustomers 
+  subscribeToCustomers,
+  normalizePhoneNumber
 } from './firebase';
 
 import Header from './components/Header';
@@ -90,20 +91,32 @@ export default function App() {
       });
   };
 
-  const syncCustomersFromQuotesList = (quotes: SavedQuote[]) => {
+  const syncCustomersFromQuotesList = (quotes: SavedQuote[], currentCustList?: SavedCustomer[]) => {
     if (!Array.isArray(quotes) || quotes.length === 0) return;
+    const existingList = currentCustList || savedCustomers;
+    const knownKeys = new Set(
+      existingList.map(c => {
+        const cleanDigits = normalizePhoneNumber(c.phone);
+        return cleanDigits.length >= 7 ? `phone_${cleanDigits}` : `name_${c.name.trim().toLowerCase()}`;
+      })
+    );
+
     for (const q of quotes) {
       if (q.customer && q.customer.name && q.customer.name.trim()) {
         const custName = q.customer.name.trim();
         const custPhone = (q.customer.phone || '').trim();
         const custAddress = (q.customer.address || '').trim();
+        const cleanDigits = normalizePhoneNumber(custPhone);
+        const key = cleanDigits.length >= 7 ? `phone_${cleanDigits}` : `name_${custName.toLowerCase()}`;
         
-        // Auto-save to Firestore Cloud if not already present
-        saveCustomerToCloud({
-          name: custName,
-          phone: custPhone,
-          address: custAddress,
-        }).catch(() => {});
+        if (!knownKeys.has(key)) {
+          knownKeys.add(key);
+          saveCustomerToCloud({
+            name: custName,
+            phone: custPhone,
+            address: custAddress,
+          }).catch(() => {});
+        }
       }
     }
   };
@@ -563,7 +576,13 @@ export default function App() {
     try {
       const saved = await saveCustomerToCloud(data);
       setSavedCustomers(prev => {
-        const filtered = prev.filter(c => c.id !== saved.id && c.phone !== saved.phone);
+        const cleanTarget = normalizePhoneNumber(saved.phone);
+        const filtered = prev.filter(c => {
+          const cClean = normalizePhoneNumber(c.phone);
+          const samePhone = cleanTarget.length >= 7 && cClean.length >= 7 && cleanTarget === cClean;
+          const sameId = c.id === saved.id;
+          return !samePhone && !sameId;
+        });
         const updated = [saved, ...filtered];
         try {
           localStorage.setItem('almekawy_saved_customers', JSON.stringify(updated));

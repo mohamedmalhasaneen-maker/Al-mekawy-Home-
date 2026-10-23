@@ -249,13 +249,101 @@ export const DevSettingsModal: React.FC<DevSettingsModalProps> = ({
                 </div>
 
                 {/* Form fields */}
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Add New Custom Item Box */}
+                  <div className="bg-amber-50/80 border-2 border-amber-200/70 p-4 rounded-2xl space-y-3">
+                    <h4 className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>إضافة قطاع جديد أو إضافة اختيارية جديدة</span>
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <select
+                        id="custom-item-type-select"
+                        className="p-2.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                        defaultValue="profile"
+                      >
+                        <option value="profile">قطاع جديد (Profile)</option>
+                        <option value="addon">إضافة اختيارية جديدة (Addon)</option>
+                      </select>
+                      <input
+                        type="text"
+                        id="custom-item-name-input"
+                        placeholder="اسم القطاع أو الإضافية (مثل: جطاع لامينا)"
+                        className="p-2.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          id="custom-item-price-input"
+                          placeholder="السعر (ج.م)"
+                          className="w-full p-2.5 bg-white border border-amber-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                          min="0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const typeSelect = document.getElementById('custom-item-type-select') as HTMLSelectElement;
+                            const nameInput = document.getElementById('custom-item-name-input') as HTMLInputElement;
+                            const priceInput = document.getElementById('custom-item-price-input') as HTMLInputElement;
+                            
+                            const name = nameInput?.value?.trim();
+                            const price = Number(priceInput?.value || 0);
+                            const itemType = typeSelect?.value;
+
+                            if (!name) {
+                              alert('يرجى إدخال اسم صحيح');
+                              return;
+                            }
+
+                            const customId = `custom_${Date.now()}`;
+                            if (itemType === 'profile') {
+                              setTempProfiles(prev => ({
+                                ...prev,
+                                [customId]: { id: customId, name, price }
+                              }));
+                            } else {
+                              setTempAddons(prev => ({
+                                ...prev,
+                                [customId]: { id: customId, name, price, isFlat: true, unit: 'للقطعة' }
+                              }));
+                            }
+                            nameInput.value = '';
+                            priceInput.value = '';
+                            alert(`تمت إضافة "${name}" بنجاح! اضغط على "حفظ جميع الأسعار" في الأسفل لتثبيتها.`);
+                          }}
+                          className="bg-[#0F172A] hover:bg-black text-[#FACC15] px-4 py-2.5 rounded-xl font-black text-xs shrink-0 cursor-pointer shadow-sm"
+                        >
+                          إضافة
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   {activeTab === 'profiles' ? (
                     <div className="space-y-3">
                       <p className="text-xs text-slate-400 font-bold mb-1">قم بتعديل سعر المتر المربع الأساسي للقطاعات التالية (بما يشمل الإكسسوارات والتركيب):</p>
                       {(Object.values(tempProfiles) as Profile[]).map((p) => (
                         <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white rounded-2xl border border-slate-200 gap-3">
-                          <span className="font-black text-sm text-slate-800">{p.name}</span>
+                          <span className="font-black text-sm text-slate-800 flex items-center gap-2">
+                            <span>{p.name}</span>
+                            {p.id.startsWith('custom_') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`هل أنت متأكد من حذف القطاع "${p.name}"؟`)) {
+                                    setTempProfiles(prev => {
+                                      const copy = { ...prev };
+                                      delete copy[p.id];
+                                      return copy;
+                                    });
+                                  }
+                                }}
+                                className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-lg border border-red-200"
+                              >
+                                حذف
+                              </button>
+                            )}
+                          </span>
                           <div className="flex items-center gap-2 self-start sm:self-auto">
                             <input
                               type="number"
@@ -282,6 +370,23 @@ export const DevSettingsModal: React.FC<DevSettingsModalProps> = ({
                                 <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
                                   يعمل أيضاً كمضاعف × 1.5 لسعر القطاع الأساسي
                                 </span>
+                              )}
+                              {a.id.startsWith('custom_') && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`هل أنت متأكد من حذف الإضافة "${a.name}"؟`)) {
+                                      setTempAddons(prev => {
+                                        const copy = { ...prev };
+                                        delete copy[a.id];
+                                        return copy;
+                                      });
+                                    }
+                                  }}
+                                  className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-lg border border-red-200"
+                                >
+                                  حذف
+                                </button>
                               )}
                             </span>
                             <div className="flex items-center gap-2 self-start sm:self-auto">

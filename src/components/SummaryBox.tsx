@@ -39,10 +39,10 @@ export default function SummaryBox({ calculations, customer, onChange, formatCur
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="mt-12 bg-[#F1F5F9] border-2 border-slate-200 rounded-3xl p-6 md:p-10 relative overflow-hidden print:hidden flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8"
+      className="mt-6 md:mt-12 bg-[#F1F5F9] border-2 border-slate-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-10 relative overflow-hidden print:hidden flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 md:gap-8"
     >
       {/* القسم التفاعلي للخصومات والملاحظات */}
-      <div className="flex-1 min-w-0 space-y-6 text-right w-full">
+      <div className="flex-1 min-w-0 space-y-4 sm:space-y-6 text-right w-full">
         <div>
           <h3 className="text-xs font-black uppercase tracking-widest text-[#0F172A] mb-1 font-display flex items-center gap-2">
             <NotebookPen size={16} />
@@ -54,7 +54,7 @@ export default function SummaryBox({ calculations, customer, onChange, formatCur
         </div>
 
         {/* 1. الخصم المباشر التفاعلي */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-5 rounded-2xl border border-slate-150/80 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-150/80 shadow-sm">
           <div>
             <label className="block text-xs font-extrabold text-slate-600 mb-2 uppercase tracking-wider flex items-center gap-1.5">
               <BadgePercent size={14} className="text-[#0F172A]" />
@@ -64,22 +64,22 @@ export default function SummaryBox({ calculations, customer, onChange, formatCur
               <button
                 type="button"
                 onClick={() => onChange('discountType', 'cash')}
-                className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   discountType === 'cash' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:bg-slate-200/60 text-slate-500'
                 }`}
               >
-                <Coins size={12} />
-                خصم نقدي (ج.م)
+                <Coins size={13} />
+                <span>خصم نقدي (ج.م)</span>
               </button>
               <button
                 type="button"
                 onClick={() => onChange('discountType', 'percentage')}
-                className={`flex-1 py-1.5 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 px-3 text-center rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   discountType === 'percentage' ? 'bg-[#0F172A] text-white shadow-sm' : 'hover:bg-slate-200/60 text-slate-500'
                 }`}
               >
-                <Percent size={12} />
-                خصم نسبة (%)
+                <Percent size={13} />
+                <span>خصم نسبة (%)</span>
               </button>
             </div>
           </div>
@@ -92,6 +92,7 @@ export default function SummaryBox({ calculations, customer, onChange, formatCur
               <input
                 type="number"
                 min="0"
+                inputMode="decimal"
                 max={discountType === 'percentage' ? 100 : undefined}
                 value={discountValue || ''}
                 onChange={(e) => {
@@ -99,9 +100,9 @@ export default function SummaryBox({ calculations, customer, onChange, formatCur
                   onChange('discountValue', isNaN(val) ? 0 : val);
                 }}
                 placeholder={discountType === 'percentage' ? "0%" : "0 ج.م"}
-                className="w-full p-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all font-bold placeholder:text-slate-350 text-right pr-3 pl-12"
+                className="w-full p-2.5 min-h-[44px] bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-[#FACC15] focus:border-[#0F172A] focus:bg-white outline-none transition-all font-bold text-sm sm:text-base placeholder:text-slate-350 text-right pr-3 pl-12"
               />
-              <div className="absolute left-3 top-2.5 text-slate-400 font-extrabold text-sm pointer-events-none">
+              <div className="absolute left-3 top-3 text-slate-400 font-extrabold text-sm pointer-events-none">
                 {discountType === 'percentage' ? '%' : 'ج.م'}
               </div>
             </div>

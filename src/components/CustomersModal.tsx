@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { SavedCustomer } from '../types';
+import { normalizePhoneNumber } from '../firebase';
 
 interface CustomersModalProps {
   isOpen: boolean;
@@ -51,12 +52,15 @@ export default function CustomersModal({
 
   const filteredCustomers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const qClean = normalizePhoneNumber(q);
     if (!q) return customers;
-    return customers.filter(c => 
-      c.name.toLowerCase().includes(q) || 
-      c.phone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, '')) ||
-      (c.address && c.address.toLowerCase().includes(q))
-    );
+    return customers.filter(c => {
+      const matchName = c.name.toLowerCase().includes(q);
+      const cClean = normalizePhoneNumber(c.phone);
+      const matchPhone = qClean ? (cClean.includes(qClean) || qClean.includes(cClean)) : false;
+      const matchAddress = Boolean(c.address && c.address.toLowerCase().includes(q));
+      return matchName || matchPhone || matchAddress;
+    });
   }, [customers, searchQuery]);
 
   const handleAddNew = async (e: React.FormEvent) => {

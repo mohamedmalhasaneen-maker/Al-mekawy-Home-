@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
+  initializeFirestore,
   collection, 
   doc, 
   setDoc, 
@@ -17,16 +18,45 @@ import { SavedQuote, CustomerInfo, SavedCustomer } from './types';
 // Initialize Firebase App safely
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Use the designated database ID if provided, otherwise default
-export const db = getFirestore(
-  app, 
-  firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-    ? firebaseConfig.firestoreDatabaseId 
-    : undefined
-);
+const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId 
+  : undefined;
+
+// Initialize Firestore with long-polling to prevent 10s connection timeout in browser/iframe
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }, dbId);
+} catch (e) {
+  firestoreDb = getFirestore(app, dbId);
+}
+export const db = firestoreDb;
 
 const QUOTES_COLLECTION = 'quotes';
 const CUSTOMERS_COLLECTION = 'customers';
+
+/**
+ * Normalizes any phone number format (converts Arabic numerals, removes symbols, normalizes Egyptian country code)
+ */
+export function normalizePhoneNumber(phone?: string | null): string {
+  if (!phone) return '';
+  const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  let cleaned = phone.toString().trim();
+  for (let i = 0; i < 10; i++) {
+    cleaned = cleaned.replaceAll(arabicDigits[i], i.toString());
+  }
+  let digits = cleaned.replace(/\D/g, '');
+  if (digits.startsWith('0020')) {
+    digits = digits.slice(4);
+  } else if (digits.startsWith('20') && digits.length === 12) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 10 && (digits.startsWith('10') || digits.startsWith('11') || digits.startsWith('12') || digits.startsWith('15'))) {
+    digits = '0' + digits;
+  }
+  return digits;
+}
 
 const defaultCustomer: CustomerInfo = {
   name: '',
@@ -161,21 +191,21 @@ export function subscribeToQuotes(onUpdate: (quotes: SavedQuote[]) => void): () 
 export async function saveCustomerToCloud(customer: Partial<SavedCustomer> & { name: string; phone?: string }): Promise<SavedCustomer> {
   try {
     const trimmedName = customer.name.trim();
-    const trimmedPhone = (customer.phone || '').trim();
-    const cleanDigits = trimmedPhone.replace(/[^0-9]/g, '');
+    const rawPhone = (customer.phone || '').trim();
+    const cleanDigits = normalizePhoneNumber(rawPhone);
     
-    // Normalize clean ID: use existing id, clean phone digits, or stable name slug (NO timestamp!)
-    const customerId = customer.id || (
-      cleanDigits.length >= 7 
-        ? `cust_${cleanDigits}` 
-        : `cust_name_${encodeURIComponent(trimmedName.toLowerCase().replace(/\s+/g, '_')).slice(0, 30)}`
-    );
+    // Deterministic customerId: normalize clean phone digits (or stable name slug)
+    const customerId = cleanDigits.length >= 7 
+      ? `cust_${cleanDigits}` 
+      : (customer.id && !customer.id.startsWith('cust_name_')
+          ? customer.id
+          : `cust_name_${encodeURIComponent(trimmedName.toLowerCase().replace(/\s+/g, '_')).slice(0, 30)}`);
     const nowIso = new Date().toISOString();
 
     const customerRecord: SavedCustomer = {
       id: customerId,
       name: trimmedName,
-      phone: trimmedPhone,
+      phone: cleanDigits ? cleanDigits : rawPhone,
       address: customer.address?.trim() || '',
       notes: customer.notes?.trim() || '',
       createdAt: customer.createdAt || nowIso,
@@ -199,10 +229,13 @@ export async function saveCustomerToCloud(customer: Partial<SavedCustomer> & { n
 function deduplicateCustomers(list: SavedCustomer[]): SavedCustomer[] {
   const map = new Map<string, SavedCustomer>();
   for (const c of list) {
-    const cleanDigits = (c.phone || '').replace(/[^0-9]/g, '');
+    const cleanDigits = normalizePhoneNumber(c.phone);
     const key = cleanDigits.length >= 7 ? `phone_${cleanDigits}` : `name_${c.name.trim().toLowerCase()}`;
     if (!map.has(key)) {
-      map.set(key, c);
+      map.set(key, {
+        ...c,
+        phone: cleanDigits || c.phone,
+      });
     } else {
       const existing = map.get(key)!;
       const existingTime = new Date(existing.updatedAt || 0).getTime();
@@ -210,12 +243,14 @@ function deduplicateCustomers(list: SavedCustomer[]): SavedCustomer[] {
       if (currentTime >= existingTime) {
         map.set(key, {
           ...c,
+          phone: cleanDigits || c.phone || existing.phone,
           address: c.address || existing.address,
           notes: c.notes || existing.notes,
         });
       } else {
         map.set(key, {
           ...existing,
+          phone: cleanDigits || existing.phone || c.phone,
           address: existing.address || c.address,
           notes: existing.notes || c.notes,
         });

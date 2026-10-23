@@ -49,6 +49,25 @@ function writeSavedCustomers(customers: any[]) {
   }
 }
 
+function normalizePhone(phone: any): string {
+  if (!phone) return "";
+  const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  let cleaned = phone.toString().trim();
+  for (let i = 0; i < 10; i++) {
+    cleaned = cleaned.replaceAll(arabicDigits[i], i.toString());
+  }
+  let digits = cleaned.replace(/\D/g, "");
+  if (digits.startsWith("0020")) {
+    digits = digits.slice(4);
+  } else if (digits.startsWith("20") && digits.length === 12) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 10 && (digits.startsWith("10") || digits.startsWith("11") || digits.startsWith("12") || digits.startsWith("15"))) {
+    digits = "0" + digits;
+  }
+  return digits;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -76,28 +95,29 @@ async function startServer() {
       if (newQuote.customer && newQuote.customer.name && newQuote.customer.name.trim()) {
         try {
           const custName = newQuote.customer.name.trim();
-          const custPhone = (newQuote.customer.phone || '').trim();
-          const custAddress = (newQuote.customer.address || '').trim();
-          const customerId = custPhone 
-            ? `cust_${custPhone.replace(/[^0-9]/g, '')}` 
+          const rawPhone = (newQuote.customer.phone || '').trim();
+          const cleanPhone = normalizePhone(rawPhone);
+          const customerId = cleanPhone.length >= 7 
+            ? `cust_${cleanPhone}` 
             : `cust_${Buffer.from(custName).toString('hex').slice(0, 16)}`;
           
           const customerRecord = {
             id: customerId,
             name: custName,
-            phone: custPhone,
-            address: custAddress,
+            phone: cleanPhone || rawPhone,
+            address: (newQuote.customer.address || '').trim(),
             notes: '',
             updatedAt: new Date().toISOString(),
             createdAt: new Date().toISOString()
           };
 
           const customers = readSavedCustomers();
-          const filteredCust = customers.filter((c: any) => 
-            c.id !== customerId && 
-            (!custPhone || c.phone !== custPhone) && 
-            c.name.toLowerCase() !== custName.toLowerCase()
-          );
+          const filteredCust = customers.filter((c: any) => {
+            const cClean = normalizePhone(c.phone);
+            const samePhone = cleanPhone.length >= 7 && cClean.length >= 7 && cleanPhone === cClean;
+            const sameId = c.id === customerId;
+            return !samePhone && !sameId;
+          });
           writeSavedCustomers([customerRecord, ...filteredCust]);
         } catch (custSyncErr) {
           console.error("Auto customer sync error in server.ts:", custSyncErr);
@@ -132,16 +152,18 @@ async function startServer() {
       for (const q of quotes) {
         if (q.customer && q.customer.name && q.customer.name.trim()) {
           const name = q.customer.name.trim();
-          const phone = (q.customer.phone || '').trim();
-          const exists = customers.some((c: any) => 
-            c.name.toLowerCase() === name.toLowerCase() || 
-            (phone && c.phone === phone)
-          );
+          const rawPhone = (q.customer.phone || '').trim();
+          const cleanPhone = normalizePhone(rawPhone);
+          const exists = customers.some((c: any) => {
+            const cClean = normalizePhone(c.phone);
+            const samePhone = cleanPhone.length >= 7 && cClean.length >= 7 && cleanPhone === cClean;
+            return samePhone || (c.name && c.name.toLowerCase() === name.toLowerCase());
+          });
           if (!exists) {
             customers.push({
-              id: phone ? `cust_${phone.replace(/[^0-9]/g, '')}` : `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              id: cleanPhone.length >= 7 ? `cust_${cleanPhone}` : `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
               name,
-              phone,
+              phone: cleanPhone || rawPhone,
               address: (q.customer.address || '').trim(),
               notes: '',
               createdAt: q.date || new Date().toISOString(),
@@ -167,16 +189,22 @@ async function startServer() {
       if (!customer || !customer.name) {
         return res.status(400).json({ error: "اسم العميل مطلوب" });
       }
-      const customerPhone = (customer.phone || '').trim();
-      const customerId = customer.id || `cust_${customerPhone.replace(/[^0-9]/g, '') || Date.now()}`;
+      const rawPhone = (customer.phone || '').trim();
+      const cleanPhone = normalizePhone(rawPhone);
+      const customerId = cleanPhone.length >= 7 ? `cust_${cleanPhone}` : (customer.id || `cust_${Date.now()}`);
       const customerRecord = {
         ...customer,
         id: customerId,
-        phone: customerPhone,
+        phone: cleanPhone || rawPhone,
         updatedAt: new Date().toISOString()
       };
       const customers = readSavedCustomers();
-      const filtered = customers.filter((c: any) => c.id !== customerId && (!customerPhone || c.phone !== customerPhone));
+      const filtered = customers.filter((c: any) => {
+        const cClean = normalizePhone(c.phone);
+        const samePhone = cleanPhone.length >= 7 && cClean.length >= 7 && cleanPhone === cClean;
+        const sameId = c.id === customerId;
+        return !samePhone && !sameId;
+      });
       const updated = [customerRecord, ...filtered];
       writeSavedCustomers(updated);
       res.json({ success: true, customer: customerRecord });

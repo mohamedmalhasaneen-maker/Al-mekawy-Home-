@@ -15,6 +15,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { CustomerInfo, SavedCustomer } from '../types';
+import { normalizePhoneNumber } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -53,7 +54,7 @@ export default function CustomerForm({
   // Filter registered customers matching currently typed name or phone
   const suggestions = useMemo(() => {
     const qName = (customer.name || '').trim().toLowerCase();
-    const qPhone = (customer.phone || '').replace(/[^0-9]/g, '');
+    const qPhone = normalizePhoneNumber(customer.phone);
 
     if (!qName && !qPhone) {
       // Return first 5 most recent if user clicks and input is empty
@@ -62,7 +63,8 @@ export default function CustomerForm({
 
     return savedCustomers.filter(c => {
       const matchName = qName && c.name.toLowerCase().includes(qName);
-      const matchPhone = qPhone && c.phone.replace(/[^0-9]/g, '').includes(qPhone);
+      const cPhoneClean = normalizePhoneNumber(c.phone);
+      const matchPhone = qPhone && (cPhoneClean.includes(qPhone) || qPhone.includes(cPhoneClean));
       return matchName || matchPhone;
     }).slice(0, 6);
   }, [customer.name, customer.phone, savedCustomers]);
