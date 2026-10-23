@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Phone, MessageCircle, Facebook, Instagram, Settings, Sun, Moon, FileText, Save, Check, Globe, Users, Images } from 'lucide-react';
 import { motion } from 'motion/react';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
+import { ContactSelectModal } from './ContactSelectModal';
 
 const TikTokIcon = ({ className = '', size = 14 }: { className?: string, size?: number }) => (
   <svg 
@@ -37,6 +38,7 @@ export default function Header({
   onOpenCustomers
 }: HeaderProps) {
   const [justSaved, setJustSaved] = useState(false);
+  const [contactModalType, setContactModalType] = useState<'phone' | 'whatsapp' | 'all' | null>(null);
 
   const handleAutoSave = () => {
     onSaveQuoteAuto();
@@ -179,15 +181,14 @@ export default function Header({
             </div>
 
             {/* Green WhatsApp Button */}
-            <a 
-              href="https://wa.me/201141761261" 
-              target="_blank" 
-              rel="noreferrer" 
+            <button 
+              type="button"
+              onClick={() => setContactModalType('whatsapp')}
               className="bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-md shadow-green-950/10"
             >
               <MessageCircle size={14} className="text-white" />
               <span>واتساب</span>
-            </a>
+            </button>
 
             {/* Social channels */}
             <div className="flex gap-2">
@@ -222,6 +223,12 @@ export default function Header({
           </motion.div>
         </div>
       </div>
+
+      <ContactSelectModal
+        isOpen={!!contactModalType}
+        type={contactModalType || 'whatsapp'}
+        onClose={() => setContactModalType(null)}
+      />
     </header>
   );
 }

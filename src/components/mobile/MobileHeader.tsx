@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import logoUrl from '../../assets/images/almekawy_logo_1780823019540.png';
+import { ContactSelectModal } from '../ContactSelectModal';
 
 const TikTokIcon = ({ className = '', size = 14 }: { className?: string, size?: number }) => (
   <svg 
@@ -59,6 +60,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [contactModalType, setContactModalType] = useState<'phone' | 'whatsapp' | 'all' | null>(null);
 
   const handleAutoSave = () => {
     onSaveQuoteAuto();
@@ -117,24 +119,24 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             </button>
 
             {/* Quick WhatsApp Link Button */}
-            <a
-              href="https://wa.me/201141761261"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-xl transition active:scale-95 shadow-sm flex items-center justify-center"
+            <button
+              type="button"
+              onClick={() => setContactModalType('whatsapp')}
+              className="p-2 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-xl transition active:scale-95 shadow-sm flex items-center justify-center cursor-pointer"
               title="تواصل عبر واتساب"
             >
               <MessageCircle size={16} />
-            </a>
+            </button>
 
             {/* Direct Phone Call Button */}
-            <a
-              href="tel:+201141761261"
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-[#FACC15] rounded-xl border border-slate-700 transition active:scale-95"
+            <button
+              type="button"
+              onClick={() => setContactModalType('phone')}
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-[#FACC15] rounded-xl border border-slate-700 transition active:scale-95 cursor-pointer"
               title="اتصال بالمبيعات"
             >
               <Phone size={16} />
-            </a>
+            </button>
 
             {/* Drawer Menu Trigger */}
             <button
@@ -327,18 +329,20 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                   </p>
                   
                   {/* Green WhatsApp Button */}
-                  <a
-                    href="https://wa.me/201141761261"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-3 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-2xl font-black text-xs flex items-center justify-between shadow-md transition active:scale-98"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      setContactModalType('whatsapp');
+                    }}
+                    className="w-full p-3 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-2xl font-black text-xs flex items-center justify-between shadow-md transition active:scale-98 cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
                       <MessageCircle size={18} className="text-white" />
                       <span>واتساب المبيعات المباشر</span>
                     </div>
-                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-lg font-mono">01141761261</span>
-                  </a>
+                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-lg font-mono">اختيار الرقم</span>
+                  </button>
 
                   {/* Facebook, Instagram, TikTok Channels Grid */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
@@ -380,20 +384,28 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                     أرقام المبيعات والدعم الفني
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    <a
-                      href="tel:+201141761261"
-                      className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-center font-mono font-bold text-xs text-[#FACC15] border border-slate-700 flex items-center justify-center gap-1.5"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDrawerOpen(false);
+                        setContactModalType('phone');
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-center font-mono font-bold text-xs text-[#FACC15] border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Phone size={13} />
                       <span>01141761261</span>
-                    </a>
-                    <a
-                      href="tel:+201060524985"
-                      className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-center font-mono font-bold text-xs text-[#FACC15] border border-slate-700 flex items-center justify-center gap-1.5"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDrawerOpen(false);
+                        setContactModalType('phone');
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-center font-mono font-bold text-xs text-[#FACC15] border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Phone size={13} />
                       <span>01060524985</span>
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -409,6 +421,13 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Selection Modal */}
+      <ContactSelectModal
+        isOpen={!!contactModalType}
+        type={contactModalType || 'phone'}
+        onClose={() => setContactModalType(null)}
+      />
     </>
   );
 };
