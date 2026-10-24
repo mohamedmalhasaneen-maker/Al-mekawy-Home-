@@ -1,12 +1,5 @@
 import React from 'react';
-import { 
-  Calculator, 
-  FileText, 
-  Plus, 
-  Sparkles, 
-  QrCode 
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { 
   QuoteItem, 
   CalculatedItem, 
@@ -103,35 +96,6 @@ export const MobileView: React.FC<MobileViewProps> = ({
 
       {/* Main Container */}
       <main className="px-3 py-4 space-y-4">
-        {/* Top Segmented Tab Switch */}
-        <div className="flex bg-slate-200/80 p-1 rounded-2xl border border-slate-300 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('input')}
-            className={`flex-1 py-2.5 px-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMainTab === 'input'
-                ? 'bg-[#0F172A] text-[#FACC15] shadow-md'
-                : 'text-slate-600 hover:text-[#0F172A]'
-            }`}
-          >
-            <Calculator size={15} />
-            <span>بيانات العميل والبنود</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('quote')}
-            className={`flex-1 py-2.5 px-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMainTab === 'quote'
-                ? 'bg-[#0F172A] text-[#FACC15] shadow-md'
-                : 'text-slate-600 hover:text-[#0F172A]'
-            }`}
-          >
-            <FileText size={15} />
-            <span>عرض السعر (PDF)</span>
-          </button>
-        </div>
-
         {/* Tab Content: Input View */}
         {activeMainTab === 'input' && (
           <div className="space-y-4">
