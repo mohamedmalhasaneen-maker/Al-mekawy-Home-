@@ -242,6 +242,19 @@
     break-after: avoid !important;
   }
 
+  /* Paginated quotation sheets (12 items per page) */
+  #quotation-print-sheet {
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-bottom: 0 !important;
+  }
+
+  .quotation-page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
   /* Force background colors on all modern browsers during print */
   * {
     color-adjust: exact !important;
