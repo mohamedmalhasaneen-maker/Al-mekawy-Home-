@@ -1,193 +1,213 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Cairo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Cairo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* Dark Mode Core Theme overrides (only active on screen to allow pristine white print) */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Official PDF Paper Sheet — Always crisp white paper & dark ink regardless of app theme */
+.pdf-paper-sheet {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-sizing: border-box;
+}
+
+/* Dark Mode Core Theme overrides (only active on screen and strictly excluded from .pdf-paper-sheet) */
 @media screen {
   .dark-mode {
     background-color: #0F172A !important;
     color: #F1F5F9 !important;
   }
-  
-  /* App backgrounds */
+
   .dark-mode.min-h-screen {
     background-color: #0B0F19 !important;
   }
 
-  /* White card overrides */
-  .dark-mode .bg-white {
+  .dark-mode .bg-white:not(.pdf-paper-sheet):not(.pdf-paper-sheet *) {
     background-color: #131B2E !important;
     color: #F8FAFC !important;
     border-color: #1E293B !important;
   }
 
-  .dark-mode .bg-slate-50 {
+  .dark-mode .bg-slate-50:not(.pdf-paper-sheet *) {
     background-color: #0F172A !important;
     color: #F1F5F9 !important;
   }
 
-  .dark-mode .bg-slate-100 {
+  .dark-mode .bg-slate-100:not(.pdf-paper-sheet *) {
     background-color: #1E293B !important;
     color: #F1F5F9 !important;
   }
 
-  .dark-mode .bg-[#F8F9FA] {
+  .dark-mode .bg-\[\#F8F9FA\]:not(.pdf-paper-sheet *) {
     background-color: #0B0F19 !important;
   }
 
-  .dark-mode .bg-[#F1F5F9] {
+  .dark-mode .bg-\[\#E8EEF5\]:not(.pdf-paper-sheet *) {
+    background-color: #0B1120 !important;
+  }
+
+  .dark-mode .bg-\[\#F1F5F9\]:not(.pdf-paper-sheet *) {
     background-color: #131B2E !important;
     border-color: #1E293B !important;
   }
 
-  /* Form inputs and select elements */
-  .dark-mode input:not([type="checkbox"]):not([type="radio"]), 
-  .dark-mode select, 
+  .dark-mode input:not([type="checkbox"]):not([type="radio"]),
+  .dark-mode select,
   .dark-mode textarea {
     background-color: #0F172A !important;
     color: #F8FAFC !important;
     border-color: #1E293B !important;
   }
 
-  .dark-mode input:not([type="checkbox"]):not([type="radio"]):focus, 
-  .dark-mode select:focus, 
+  .dark-mode input:not([type="checkbox"]):not([type="radio"]):focus,
+  .dark-mode select:focus,
   .dark-mode textarea:focus {
     background-color: #1E293B !important;
     border-color: #FACC15 !important;
     box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.2) !important;
   }
 
-  /* Border color mappings */
-  .dark-mode .border-slate-150\/80,
-  .dark-mode .border-slate-200,
-  .dark-mode .border-slate-200\/60,
-  .dark-mode .border-slate-200\/80,
-  .dark-mode .border-slate-200\/90,
-  .dark-mode .border-slate-100 {
+  .dark-mode .border-slate-150\/80:not(.pdf-paper-sheet *),
+  .dark-mode .border-slate-200:not(.pdf-paper-sheet *),
+  .dark-mode .border-slate-200\/60:not(.pdf-paper-sheet *),
+  .dark-mode .border-slate-200\/80:not(.pdf-paper-sheet *),
+  .dark-mode .border-slate-200\/90:not(.pdf-paper-sheet *),
+  .dark-mode .border-slate-100:not(.pdf-paper-sheet *) {
     border-color: #1E293B !important;
   }
 
-  .dark-mode .border-slate-350 {
+  .dark-mode .border-slate-350:not(.pdf-paper-sheet *) {
     border-color: #475569 !important;
   }
 
-  /* Text color overrides */
-  .dark-mode .text-[#0F172A] {
+  .dark-mode .text-\[\#0F172A\]:not(.pdf-paper-sheet):not(.pdf-paper-sheet *):not(.bg-\[\#FACC15\]):not(.bg-\[\#FACC15\] *) {
     color: #FACC15 !important;
   }
 
-  .dark-mode .text-[#1A1A1A] {
+  .dark-mode .text-\[\#1A1A1A\]:not(.pdf-paper-sheet *) {
     color: #E2E8F0 !important;
   }
 
-  .dark-mode .text-slate-900 {
+  .dark-mode .text-slate-900:not(.pdf-paper-sheet):not(.pdf-paper-sheet *) {
     color: #F8FAFC !important;
   }
 
-  .dark-mode .text-slate-800 {
+  .dark-mode .text-slate-800:not(.pdf-paper-sheet *) {
     color: #E2E8F0 !important;
   }
 
-  .dark-mode .text-slate-700 {
+  .dark-mode .text-slate-700:not(.pdf-paper-sheet *) {
     color: #CBD5E1 !important;
   }
 
-  .dark-mode .text-slate-600 {
+  .dark-mode .text-slate-600:not(.pdf-paper-sheet *) {
     color: #94A3B8 !important;
   }
 
-  .dark-mode .text-slate-500 {
+  .dark-mode .text-slate-500:not(.pdf-paper-sheet *) {
     color: #64748B !important;
   }
 
-  .dark-mode .text-slate-400 {
+  .dark-mode .text-slate-400:not(.pdf-paper-sheet *) {
     color: #475569 !important;
   }
 
-  /* Special UI tags override */
-  .dark-mode .bg-green-50 {
+  .dark-mode .bg-green-50:not(.pdf-paper-sheet *) {
     background-color: rgba(6, 78, 59, 0.5) !important;
     color: #34D399 !important;
   }
 
-  .dark-mode .bg-green-100 {
+  .dark-mode .bg-green-100:not(.pdf-paper-sheet *) {
     background-color: rgba(6, 78, 59, 0.7) !important;
     color: #34D399 !important;
   }
 
-  .dark-mode .bg-amber-50 {
+  .dark-mode .bg-amber-50:not(.pdf-paper-sheet *) {
     background-color: rgba(120, 53, 15, 0.4) !important;
     color: #FBBF24 !important;
   }
 
-  .dark-mode .bg-yellow-50 {
+  .dark-mode .bg-yellow-50:not(.pdf-paper-sheet *) {
     background-color: rgba(120, 53, 15, 0.4) !important;
     color: #FBBF24 !important;
   }
 
-  .dark-mode .bg-emerald-50 {
+  .dark-mode .bg-emerald-50:not(.pdf-paper-sheet *) {
     background-color: rgba(6, 78, 59, 0.5) !important;
     color: #34D399 !important;
   }
 
-  .dark-mode .bg-emerald-100 {
+  .dark-mode .bg-emerald-100:not(.pdf-paper-sheet *) {
     background-color: rgba(6, 78, 59, 0.7) !important;
     color: #34D399 !important;
   }
 
-  .dark-mode .bg-red-50 {
+  .dark-mode .bg-red-50:not(.pdf-paper-sheet *) {
     background-color: rgba(127, 29, 29, 0.4) !important;
     color: #FCA5A5 !important;
   }
 
-  .dark-mode .bg-red-100 {
+  .dark-mode .bg-red-100:not(.pdf-paper-sheet *) {
     background-color: rgba(127, 29, 29, 0.6) !important;
     color: #FCA5A5 !important;
   }
 
-  .dark-mode .bg-[#0F172A] {
+  .dark-mode .bg-\[\#0F172A\]:not(.pdf-paper-sheet *):not(.quote-preview-header) {
     background-color: #1E293B !important;
   }
 
-  .dark-mode .bg-[#0F172A]\/5 {
+  .dark-mode .bg-\[\#0F172A\]\/5:not(.pdf-paper-sheet *) {
     background-color: rgba(30, 41, 59, 0.5) !important;
     color: #F8FAFC !important;
   }
 
-  .dark-mode .bg-slate-200\/60 {
+  .dark-mode .bg-slate-200\/60:not(.pdf-paper-sheet *) {
     background-color: #0F172A !important;
   }
 
-  .dark-mode .hover\:bg-slate-100:hover {
+  .dark-mode .hover\:bg-slate-100:hover:not(.pdf-paper-sheet *) {
     background-color: #1E293B !important;
   }
 
-  .dark-mode .hover\:bg-slate-50:hover {
+  .dark-mode .hover\:bg-slate-50:hover:not(.pdf-paper-sheet *) {
     background-color: #0F172A !important;
   }
 
-  /* Sticky mobile bar and chats */
   .dark-mode .fixed.bottom-0 {
     background-color: rgba(19, 27, 46, 0.95) !important;
     border-top-color: #1E293B !important;
   }
 
-  /* Modals overrides */
-  .dark-mode .bg-white\/80 {
+  .dark-mode .bg-white\/80:not(.pdf-paper-sheet *) {
     background-color: rgba(19, 27, 46, 0.8) !important;
   }
 
-  /* Chat popup override */
   .dark-mode .shadow-2xl {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
   }
 
-  /* Specific detailed preview container overriders to keep it fully legible */
-  .dark-mode .bg-[#FFFBEB] {
+  .dark-mode .bg-\[\#FFFBEB\]:not(.pdf-paper-sheet *) {
     background-color: #1E293B !important;
     color: #FEF3C7 !important;
   }
@@ -197,7 +217,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm 15mm 12mm 15mm;
+    margin: 8mm 10mm;
   }
 
   body {
@@ -208,8 +228,9 @@
     print-color-adjust: exact !important;
   }
 
-  /* Normalize main layout inside container */
-  #root, main, .min-h-screen {
+  #root,
+  main,
+  .min-h-screen {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
@@ -217,37 +238,47 @@
     background: white !important;
   }
 
-  /* Table repetitions on page split */
   thead {
     display: table-header-group !important;
   }
-  
-  tr, tbody {
+
+  tr,
+  tbody {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  /* Universal break-avoid utility class support */
   .print-break-inside-avoid,
   .print\:break-inside-avoid,
-  .signatures-block, 
+  .signatures-block,
   .terms-block {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  /* No raw unrequested page breaks after lists or boxes */
-  h1, h2, h3, h4, h5 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
 
-  /* Paginated quotation sheets (12 items per page) */
-  #quotation-print-sheet {
+  .quotation-print-container {
     transform: none !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin-bottom: 0 !important;
+    margin: 0 !important;
+  }
+
+  .quotation-page-sheet {
+    width: 100% !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 4mm 2mm !important;
   }
 
   .quotation-page-break {
@@ -255,12 +286,9 @@
     break-after: page !important;
   }
 
-  /* Force background colors on all modern browsers during print */
   * {
     color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 }
-
-

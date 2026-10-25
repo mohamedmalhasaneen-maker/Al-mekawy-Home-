@@ -697,16 +697,7 @@ export default function App() {
 
   const handlePrint = () => {
     setActiveMainTab('quote');
-    setTimeout(() => {
-      const el = document.getElementById('detailed-quote-view');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-        el.classList.add('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
-        setTimeout(() => {
-          el.classList.remove('ring-4', 'ring-[#FACC15]', 'ring-offset-2');
-        }, 1500);
-      }
-    }, 150);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -742,8 +733,8 @@ export default function App() {
         onDuplicateItem={handleDuplicateItem}
       />
 
-      {/* 2. Desktop-Dedicated View (Unchanged Desktop Layout >= md) */}
-      <div className="hidden md:block pb-24 md:pb-0">
+      {/* 2. Desktop-Dedicated View (Desktop Layout >= md, also active for @media print across all viewports) */}
+      <div className="hidden md:block print:block pb-24 md:pb-0">
         <Header 
           onOpenDevSettings={() => setIsDevModalOpen(true)} 
           theme={theme}
@@ -755,23 +746,26 @@ export default function App() {
           onOpenCustomers={() => setPasswordTarget('customers')}
         />
 
-        <main className="max-w-5xl mx-auto px-4 py-12">
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border-2 border-slate-200 border-r-8 border-r-[#0F172A] p-8 mb-12 print:hidden overflow-hidden relative shadow-sm"
-          >
-            <h2 className="text-2xl font-display font-black text-[#0F172A] mb-4 flex items-center gap-3">
-              <Calculator className="text-[#0F172A]" size={26} />
-              بوابة المكاوي هوم للتسعير التفاعلي
-            </h2>
-            <p className="text-slate-500 leading-relaxed text-base max-w-3xl">
-              أدخل مقاسات الفتحات لديك (العرض والارتفاع بالسنتيمتر)، ثم اختر نوع القطاع والإضافات التي ترغب بها لكل بند. سيقوم النظام تلقائياً بحساب المساحات (المتر المربع) وعرض التكلفة الإجمالية بدقة وبشفافية تامة.
-            </p>
-          </motion.div>
+        <main className={activeMainTab === 'quote' ? 'w-full max-w-full mx-auto px-0 py-4' : 'max-w-5xl mx-auto px-4 py-12'}>
+          {activeMainTab === 'input' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-3xl border-2 border-slate-200 border-r-8 border-r-[#0F172A] p-8 mb-12 print:hidden overflow-hidden relative shadow-sm"
+            >
+              <h2 className="text-2xl font-display font-black text-[#0F172A] mb-4 flex items-center gap-3">
+                <Calculator className="text-[#0F172A]" size={26} />
+                بوابة المكاوي هوم للتسعير التفاعلي
+              </h2>
+              <p className="text-slate-500 leading-relaxed text-base max-w-3xl">
+                أدخل مقاسات الفتحات لديك (العرض والارتفاع بالسنتيمتر)، ثم اختر نوع القطاع والإضافات التي ترغب بها لكل بند. سيقوم النظام تلقائياً بحساب المساحات (المتر المربع) وعرض التكلفة الإجمالية بدقة وبشفافية تامة.
+              </p>
+            </motion.div>
+          )}
 
           {/* Navigation Tabs for adjacent pages view */}
-          <div className="flex bg-slate-200/60 p-1.5 rounded-2xl mb-8 max-w-xl mx-auto border border-slate-200/80 print:hidden shadow-inner relative justify-between gap-1.5">
+          <div className="px-4 print:hidden">
+            <div className={`flex bg-slate-200/60 p-1.5 rounded-2xl ${activeMainTab === 'quote' ? 'mb-4' : 'mb-8'} max-w-xl mx-auto border border-slate-200/80 shadow-inner relative justify-between gap-1.5`}>
             <button
               onClick={() => setActiveMainTab('input')}
               className={`flex-1 py-3 px-3 sm:px-5 rounded-xl font-black text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer relative z-10 select-none ${
@@ -794,6 +788,7 @@ export default function App() {
               <FileText size={18} />
               <span>عرض السعر التفصيلي (PDF)</span>
             </button>
+            </div>
           </div>
 
           <div className={activeMainTab === 'input' ? 'block' : 'hidden print:hidden'}>
@@ -854,14 +849,20 @@ export default function App() {
               formatCurrency={formatCurrency}
               profiles={profiles}
               addons={addons}
+              onBack={() => {
+                setActiveMainTab('input');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
           </div>
 
-          <div className="print:hidden">
-            <Features />
-          </div>
+          {activeMainTab === 'input' && (
+            <div className="print:hidden">
+              <Features />
+            </div>
+          )}
 
-          <footer className="mt-20 text-center text-slate-400 text-sm print:hidden border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <footer className="max-w-5xl mx-auto px-4 mt-20 text-center text-slate-400 text-sm print:hidden border-t border-slate-200/65 pt-10 pb-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <p className="font-extrabold tracking-wide text-xs text-slate-400">© {new Date().getFullYear()} AL-MAKKAWI HOME • ALL RIGHTS RESERVED</p>
               <button
@@ -955,7 +956,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <AiMekawyChat />
+      {activeMainTab === 'input' && <AiMekawyChat />}
 
       <style dangerouslySetInnerHTML={{__html: `
         @media print {

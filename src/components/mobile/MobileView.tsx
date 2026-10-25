@@ -79,8 +79,38 @@ export const MobileView: React.FC<MobileViewProps> = ({
   handleSaveCustomerFromForm,
   onDuplicateItem
 }) => {
+  if (activeMainTab === 'quote') {
+    return (
+      <div
+        className="block md:hidden min-h-[100dvh] w-full max-w-full box-border bg-white text-[#1A1A1A] pb-20 font-sans print:hidden"
+        dir="rtl"
+      >
+        <DetailedQuoteView
+          customer={customer}
+          calculations={calculations}
+          formatCurrency={formatCurrency}
+          profiles={profiles}
+          addons={addons}
+        />
+
+        <MobileBottomBar
+          activeMainTab={activeMainTab}
+          setActiveMainTab={(tab) => {
+            setActiveMainTab(tab);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          savedQuotesCount={savedQuotes.length}
+          customersCount={savedCustomers.length}
+          onOpenSavedQuotes={onOpenSavedQuotes}
+          onOpenCustomers={onOpenCustomers}
+          onAddNewItem={addNewItem}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="block md:hidden min-h-screen bg-[#F8F9FA] text-[#1A1A1A] pb-24 font-sans print:hidden select-none" dir="rtl">
+    <div className="block md:hidden min-h-screen w-full max-w-full box-border bg-[#F8F9FA] text-[#1A1A1A] pb-24 font-sans print:hidden select-none" dir="rtl">
       {/* Mobile Header Top App Bar */}
       <MobileHeader
         theme={theme}
@@ -95,88 +125,75 @@ export const MobileView: React.FC<MobileViewProps> = ({
       />
 
       {/* Main Container */}
-      <main className="px-3 py-4 space-y-4">
-        {/* Tab Content: Input View */}
-        {activeMainTab === 'input' && (
-          <div className="space-y-4">
-            {/* Guide Accordion Table */}
-            <PricingTable profiles={profiles} addons={addons} />
+      <main className="px-3 py-4 space-y-4 w-full max-w-full box-border">
+        <div className="space-y-4">
+          {/* Guide Accordion Table */}
+          <PricingTable profiles={profiles} addons={addons} />
 
-            {/* Customer Details Form */}
-            <MobileCustomerForm
-              customer={customer}
-              onChange={handleCustomerChange}
-              savedCustomers={savedCustomers}
-              onOpenCustomersModal={onOpenCustomers}
-              onSaveCustomerToDirectory={handleSaveCustomerFromForm}
-              onSelectCustomer={handleSelectCustomer}
-            />
+          {/* Customer Details Form */}
+          <MobileCustomerForm
+            customer={customer}
+            onChange={handleCustomerChange}
+            savedCustomers={savedCustomers}
+            onOpenCustomersModal={onOpenCustomers}
+            onSaveCustomerToDirectory={handleSaveCustomerFromForm}
+            onSelectCustomer={handleSelectCustomer}
+          />
 
-            {/* Items Header */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2">
-                <span className="bg-[#0F172A] text-[#FACC15] text-xs font-black px-2.5 py-1 rounded-xl shadow-sm">
-                  {calculations.itemsCalculated.length} بنود
-                </span>
-                <span className="font-black text-sm text-[#0F172A]">بنود الشباك والأبواب</span>
-              </div>
-            </div>
-
-            {/* Items List */}
-            <div className="space-y-3">
-              <AnimatePresence mode="popLayout">
-                {calculations.itemsCalculated.map((item, index) => (
-                  <MobileItemCard
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    updateItem={updateItem}
-                    removeItem={removeItem}
-                    toggleAddon={toggleAddon}
-                    formatCurrency={formatCurrency}
-                    profiles={profiles}
-                    addons={addons}
-                    onDuplicateItem={onDuplicateItem}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-
-            {/* Summary Box */}
-            <MobileSummaryBox
-              calculations={calculations}
-              customer={customer}
-              onChange={handleCustomerChange}
-              formatCurrency={formatCurrency}
-              handlePrint={handlePrint}
-              onSaveQuoteAuto={handleSaveQuoteAuto}
-            />
-
-            {/* Features Info */}
-            <div className="pt-2">
-              <Features />
+          {/* Items Header */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <span className="bg-[#0F172A] text-[#FACC15] text-xs font-black px-2.5 py-1 rounded-xl shadow-sm">
+                {calculations.itemsCalculated.length} بنود
+              </span>
+              <span className="font-black text-sm text-[#0F172A]">بنود الشباك والأبواب</span>
             </div>
           </div>
-        )}
 
-        {/* Tab Content: PDF Quote Preview */}
-        {activeMainTab === 'quote' && (
+          {/* Items List */}
           <div className="space-y-3">
-            <DetailedQuoteView
-              customer={customer}
-              calculations={calculations}
-              formatCurrency={formatCurrency}
-              profiles={profiles}
-              addons={addons}
-            />
+            <AnimatePresence mode="popLayout">
+              {calculations.itemsCalculated.map((item, index) => (
+                <MobileItemCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  updateItem={updateItem}
+                  removeItem={removeItem}
+                  toggleAddon={toggleAddon}
+                  formatCurrency={formatCurrency}
+                  profiles={profiles}
+                  addons={addons}
+                  onDuplicateItem={onDuplicateItem}
+                />
+              ))}
+            </AnimatePresence>
           </div>
-        )}
+
+          {/* Summary Box */}
+          <MobileSummaryBox
+            calculations={calculations}
+            customer={customer}
+            onChange={handleCustomerChange}
+            formatCurrency={formatCurrency}
+            handlePrint={handlePrint}
+            onSaveQuoteAuto={handleSaveQuoteAuto}
+          />
+
+          {/* Features Info */}
+          <div className="pt-2">
+            <Features />
+          </div>
+        </div>
       </main>
 
       {/* Sticky Bottom Thumb Navigation Bar */}
       <MobileBottomBar
         activeMainTab={activeMainTab}
-        setActiveMainTab={setActiveMainTab}
+        setActiveMainTab={(tab) => {
+          setActiveMainTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         savedQuotesCount={savedQuotes.length}
         customersCount={savedCustomers.length}
         onOpenSavedQuotes={onOpenSavedQuotes}
