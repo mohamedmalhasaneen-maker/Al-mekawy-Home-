@@ -91,6 +91,10 @@ export const MobileView: React.FC<MobileViewProps> = ({
           formatCurrency={formatCurrency}
           profiles={profiles}
           addons={addons}
+          onBack={() => {
+            setActiveMainTab('input');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
 
         <MobileBottomBar

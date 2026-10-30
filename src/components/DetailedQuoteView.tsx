@@ -11,10 +11,14 @@ import {
   ChevronDown,
   Copy,
   Check,
-  X
+  X,
+  RefreshCw,
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import jspdf from 'jspdf';
 import * as htmlToImage from 'html-to-image';
+import html2canvas from 'html2canvas';
 import logoUrl from '../assets/images/almekawy_logo_1780823019540.png';
 
 interface Props {
@@ -28,7 +32,1002 @@ interface Props {
 
 const BASE_PAGE_WIDTH = 794; // Canonical A4 portrait width at 96 DPI (210mm)
 const A4_MIN_HEIGHT = 1123;  // Canonical A4 portrait height at 96 DPI (297mm)
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 10;
+
+// Dynamic Per-Item Typography Auto-Fit Constants
+const ABSOLUTE_MIN_FONT_PX = 5.0;        // Emergency minimum floor (~3.75pt) prioritizing full content visibility
+const READABILITY_WARNING_FONT_PX = 6.5; // Threshold (~5pt) below which a legibility review notice is shown
+const FONT_STEP_PX = 0.25;
+
+// Exact inner text container widths inside the fixed 726px table (<colgroup>: 34, 196, 78, 72, 42, 118, 92, 98)
+const DESC_BOX_WIDTH_PX = 120;
+const PROFILE_BOX_WIDTH_PX = 98;
+const ADDONS_BOX_WIDTH_PX = 72;
+const NOTES_BOX_WIDTH_PX = 696;
+
+interface PageLayoutMetrics {
+  rowInnerHeightPx: number;
+  cellContentHeightPx: number;
+  safeMeasureHeightPx: number;
+  svgBoxSizePx: number;
+  notesContentMaxHeightPx: number;
+}
+
+function getPageLayoutMetrics(params: {
+  pageIdx: number;
+  totalPages: number;
+  pageItemCount: number;
+  totalActiveNotes: number;
+}): PageLayoutMetrics {
+  const { pageIdx, totalPages, pageItemCount, totalActiveNotes } = params;
+  const isFirstPage = pageIdx === 0;
+  const isLastPage = pageIdx === totalPages - 1;
+  const hasNotes = totalActiveNotes > 0;
+
+  let rowInnerHeightPx = 60;
+  let notesContentMaxHeightPx = 0;
+
+  if (!isLastPage) {
+    // Intermediate pages always carry 10 items and distribute them evenly across the page's table area
+    rowInnerHeightPx = isFirstPage ? 73 : 82;
+    notesContentMaxHeightPx = 0;
+  } else if (isFirstPage) {
+    if (pageItemCount >= 9) {
+      rowInnerHeightPx = hasNotes ? 51 : 57;
+      notesContentMaxHeightPx = pageItemCount === 10 ? 52 : 100;
+    } else {
+      rowInnerHeightPx = 60;
+      const savedRowsPx = Math.max(0, 10 - pageItemCount) * 57;
+      notesContentMaxHeightPx = 56 + savedRowsPx;
+    }
+  } else {
+    // Multi-page final sheet (compact continuation header leaves +115px extra vertical budget)
+    if (pageItemCount >= 9) {
+      rowInnerHeightPx = hasNotes ? 57 : 65;
+      notesContentMaxHeightPx = pageItemCount === 10 ? 90 : 145;
+    } else {
+      rowInnerHeightPx = 62;
+      const savedRowsPx = Math.max(0, 10 - pageItemCount) * 61;
+      notesContentMaxHeightPx = 90 + savedRowsPx;
+    }
+  }
+
+  const cellContentHeightPx = rowInnerHeightPx - 4; // 2px top + 2px bottom inner padding
+  const safeMeasureHeightPx = Math.max(24, cellContentHeightPx - 1);
+  const svgBoxSizePx = rowInnerHeightPx < 54 ? 38 : 42;
+
+  return {
+    rowInnerHeightPx,
+    cellContentHeightPx,
+    safeMeasureHeightPx,
+    svgBoxSizePx,
+    notesContentMaxHeightPx
+  };
+}
+
+interface CellFitStyle {
+  fontSizePx: number;
+  secondaryFontSizePx: number;
+  lineHeight: number;
+  secondaryLineHeight: number;
+  gapPx: number;
+  isShrunk: boolean;
+  overflowed: boolean;
+  unreadable: boolean;
+}
+
+interface NoteFitStyle {
+  fontSizePx: number;
+  lineHeight: number;
+  isShrunk: boolean;
+  overflowed: boolean;
+  unreadable: boolean;
+}
+
+interface QuoteAutoFitWarning {
+  id: string;
+  label: string;
+  reason: 'overflow' | 'tiny-font';
+}
+
+interface QuoteAutoFitResult {
+  itemFits: Record<
+    number,
+    {
+      description: CellFitStyle;
+      profileGlass: CellFitStyle;
+      addons: CellFitStyle;
+      rowOverflowed: boolean;
+    }
+  >;
+  primaryNoteFit: NoteFitStyle;
+  additionalNoteFits: Record<string, NoteFitStyle>;
+  warnings: QuoteAutoFitWarning[];
+}
+
+const DEFAULT_DESCRIPTION_FIT: CellFitStyle = {
+  fontSizePx: 12,
+  secondaryFontSizePx: 10.5,
+  lineHeight: 1.3,
+  secondaryLineHeight: 1.22,
+  gapPx: 1.5,
+  isShrunk: false,
+  overflowed: false,
+  unreadable: false
+};
+
+const DEFAULT_PROFILE_FIT: CellFitStyle = {
+  fontSizePx: 11,
+  secondaryFontSizePx: 10,
+  lineHeight: 1.32,
+  secondaryLineHeight: 1.25,
+  gapPx: 2,
+  isShrunk: false,
+  overflowed: false,
+  unreadable: false
+};
+
+const DEFAULT_ADDONS_FIT: CellFitStyle = {
+  fontSizePx: 10.5,
+  secondaryFontSizePx: 10.5,
+  lineHeight: 1.32,
+  secondaryLineHeight: 1.32,
+  gapPx: 2,
+  isShrunk: false,
+  overflowed: false,
+  unreadable: false
+};
+
+const DEFAULT_NOTE_FIT: NoteFitStyle = {
+  fontSizePx: 12,
+  lineHeight: 1.55,
+  isShrunk: false,
+  overflowed: false,
+  unreadable: false
+};
+
+function buildFontSteps(
+  startPx: number,
+  minPx: number = ABSOLUTE_MIN_FONT_PX,
+  stepPx: number = FONT_STEP_PX
+): number[] {
+  const steps: number[] = [];
+  let cur = startPx;
+  while (cur > minPx + 0.01) {
+    steps.push(Number(cur.toFixed(2)));
+    cur -= stepPx;
+  }
+  steps.push(minPx);
+  return steps;
+}
+
+let cachedMeasureStage: HTMLDivElement | null = null;
+
+function getOrCreateAutoFitStage(): HTMLDivElement | null {
+  if (typeof document === 'undefined' || !document.body) return null;
+  if (cachedMeasureStage && document.body.contains(cachedMeasureStage)) {
+    return cachedMeasureStage;
+  }
+
+  let host = document.getElementById('almekawy-quote-autofit-host') as HTMLDivElement | null;
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'almekawy-quote-autofit-host';
+    host.setAttribute('aria-hidden', 'true');
+    host.setAttribute('dir', 'rtl');
+    host.style.cssText = [
+      'position:fixed',
+      'top:0',
+      'left:0',
+      'width:0',
+      'height:0',
+      'overflow:hidden',
+      'visibility:hidden',
+      'pointer-events:none',
+      'z-index:-9999'
+    ].join(';');
+    document.body.appendChild(host);
+  }
+
+  const stage = document.createElement('div');
+  stage.setAttribute('dir', 'rtl');
+  stage.style.cssText = [
+    `width:${BASE_PAGE_WIDTH}px`,
+    'font-family:"Cairo", ui-sans-serif, system-ui, -apple-system, sans-serif',
+    'direction:rtl',
+    'text-align:right',
+    'box-sizing:border-box',
+    '-webkit-text-size-adjust:100%'
+  ].join(';');
+  host.innerHTML = '';
+  host.appendChild(stage);
+  cachedMeasureStage = stage;
+  return stage;
+}
+
+function getItemTypeLabel(itemType: CalculatedItem['itemType']): string {
+  if (itemType === 'armored_door') return 'باب مصفح';
+  if (itemType === 'door') return 'باب';
+  if (itemType === 'balcony') return 'بلكونة';
+  return 'شباك';
+}
+
+function measureQuoteAutoFit(params: {
+  items: CalculatedItem[];
+  notes: string;
+  notesAmount: number;
+  additionalNotes: NonNullable<CustomerInfo['additionalNotes']>;
+  profiles: Record<string, Profile>;
+  addons: Record<string, Addon>;
+  totalPages: number;
+  lastPageItemCount: number;
+  formatCurrency: (val: number) => string;
+}): QuoteAutoFitResult {
+  const {
+    items,
+    notes,
+    notesAmount,
+    additionalNotes,
+    profiles,
+    addons,
+    totalPages,
+    lastPageItemCount,
+    formatCurrency
+  } = params;
+
+  const fallbackResult: QuoteAutoFitResult = {
+    itemFits: {},
+    primaryNoteFit: DEFAULT_NOTE_FIT,
+    additionalNoteFits: {},
+    warnings: []
+  };
+
+  const stage = getOrCreateAutoFitStage();
+  if (!stage) return fallbackResult;
+
+  const warnings: QuoteAutoFitWarning[] = [];
+  const itemFits: QuoteAutoFitResult['itemFits'] = {};
+
+  // Count active quote notes upfront so every page's row & note height budget matches rendering 1:1
+  const activeAdditional = additionalNotes
+    .map((n, idx) => ({ note: n, idx, key: String(n.id || idx) }))
+    .filter(entry => Boolean(entry.note.text?.trim()));
+  const hasPrimaryNote = Boolean(notes?.trim());
+  const totalActiveNotes = (hasPrimaryNote ? 1 : 0) + activeAdditional.length;
+
+  const descSteps = buildFontSteps(12, ABSOLUTE_MIN_FONT_PX, FONT_STEP_PX);
+  const profileSteps = buildFontSteps(11, ABSOLUTE_MIN_FONT_PX, FONT_STEP_PX);
+  const addonSteps = buildFontSteps(10.5, ABSOLUTE_MIN_FONT_PX, FONT_STEP_PX);
+  const noteSteps = buildFontSteps(12, ABSOLUTE_MIN_FONT_PX, FONT_STEP_PX);
+
+  // Reusable probe box inside stage
+  const box = document.createElement('div');
+  box.setAttribute('dir', 'rtl');
+  stage.innerHTML = '';
+  stage.appendChild(box);
+
+  items.forEach((item, idx) => {
+    const itemNumStr = String(idx + 1).padStart(2, '0');
+    const typeName = getItemTypeLabel(item.itemType);
+
+    const pageIdx = Math.floor(idx / ITEMS_PER_PAGE);
+    const pageItemCount = Math.min(ITEMS_PER_PAGE, Math.max(1, items.length - pageIdx * ITEMS_PER_PAGE));
+    const pageMetrics = getPageLayoutMetrics({
+      pageIdx,
+      totalPages,
+      pageItemCount,
+      totalActiveNotes
+    });
+    const safeCellHeightPx = pageMetrics.safeMeasureHeightPx;
+
+    // 1. Measure Item Description (title + opening/type subtitle) inside fixed cell budget
+    box.innerHTML = '';
+    box.style.cssText = `width:${DESC_BOX_WIDTH_PX}px;box-sizing:border-box;direction:rtl;text-align:right;`;
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText =
+      'font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+    titleEl.textContent = item.title || ' ';
+
+    const subEl = document.createElement('div');
+    subEl.style.cssText =
+      'font-weight:600;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+    subEl.textContent = `${typeName} · فتح ${item.opening}`;
+
+    box.appendChild(titleEl);
+    box.appendChild(subEl);
+
+    let descFit: CellFitStyle | null = null;
+    for (let s = 0; s < descSteps.length; s++) {
+      const fPx = descSteps[s];
+      const ratio = Math.max(0, Math.min(1, (fPx - ABSOLUTE_MIN_FONT_PX) / (12 - ABSOLUTE_MIN_FONT_PX)));
+      const subPx =
+        s === 0
+          ? 10.5
+          : Math.max(
+              ABSOLUTE_MIN_FONT_PX,
+              Number((ABSOLUTE_MIN_FONT_PX + ratio * (10.5 - ABSOLUTE_MIN_FONT_PX)).toFixed(2))
+            );
+      const mainLH = s === 0 ? 1.3 : Number((1.08 + ratio * (1.3 - 1.08)).toFixed(2));
+      const subLH = s === 0 ? 1.22 : Number((1.06 + ratio * (1.22 - 1.06)).toFixed(2));
+      const gapPx = fPx <= 8 ? 0 : fPx <= 10.5 ? 1 : 1.5;
+
+      titleEl.style.fontSize = `${fPx}px`;
+      titleEl.style.lineHeight = String(mainLH);
+      subEl.style.fontSize = `${subPx}px`;
+      subEl.style.lineHeight = String(subLH);
+      subEl.style.marginTop = `${gapPx}px`;
+
+      if (box.scrollHeight <= safeCellHeightPx && box.scrollWidth <= DESC_BOX_WIDTH_PX + 1) {
+        const unreadable = fPx < READABILITY_WARNING_FONT_PX;
+        descFit = {
+          fontSizePx: fPx,
+          secondaryFontSizePx: subPx,
+          lineHeight: mainLH,
+          secondaryLineHeight: subLH,
+          gapPx,
+          isShrunk: s > 0,
+          overflowed: false,
+          unreadable
+        };
+        if (unreadable) {
+          warnings.push({
+            id: `item-${item.id}-desc-tiny`,
+            label: `البند رقم ${itemNumStr} (بيان البند والموقع)`,
+            reason: 'tiny-font'
+          });
+        }
+        break;
+      }
+    }
+
+    if (!descFit) {
+      descFit = {
+        fontSizePx: ABSOLUTE_MIN_FONT_PX,
+        secondaryFontSizePx: ABSOLUTE_MIN_FONT_PX,
+        lineHeight: 1.08,
+        secondaryLineHeight: 1.06,
+        gapPx: 0,
+        isShrunk: true,
+        overflowed: true,
+        unreadable: true
+      };
+      warnings.push({
+        id: `item-${item.id}-desc`,
+        label: `البند رقم ${itemNumStr} (بيان البند والموقع)`,
+        reason: 'overflow'
+      });
+    }
+
+    // 2. Measure Profile & Glass Details inside fixed cell budget
+    box.innerHTML = '';
+    box.style.cssText = `width:${PROFILE_BOX_WIDTH_PX}px;box-sizing:border-box;direction:rtl;text-align:right;`;
+
+    const profEl = document.createElement('div');
+    profEl.style.cssText = 'font-weight:800;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+    profEl.textContent = profiles[item.profile]?.name || item.profile;
+
+    const glassEl = document.createElement('div');
+    glassEl.style.cssText = 'font-weight:400;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+    glassEl.textContent =
+      item.innerType === 'panel'
+        ? 'بنل بالكامل'
+        : item.innerType === 'panel_glass'
+        ? `بنل + ${item.glassType}`
+        : item.glassType;
+
+    box.appendChild(profEl);
+    box.appendChild(glassEl);
+
+    let hingeEl: HTMLDivElement | null = null;
+    if (item.opening === 'مفصلي') {
+      hingeEl = document.createElement('div');
+      hingeEl.style.cssText = 'font-weight:600;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+      hingeEl.textContent = item.hingePanes || 'ضلفة';
+      box.appendChild(hingeEl);
+    }
+
+    let profileFit: CellFitStyle | null = null;
+    for (let s = 0; s < profileSteps.length; s++) {
+      const fPx = profileSteps[s];
+      const ratio = Math.max(0, Math.min(1, (fPx - ABSOLUTE_MIN_FONT_PX) / (11 - ABSOLUTE_MIN_FONT_PX)));
+      const subPx =
+        s === 0
+          ? 10
+          : Math.max(
+              ABSOLUTE_MIN_FONT_PX,
+              Number((ABSOLUTE_MIN_FONT_PX + ratio * (10 - ABSOLUTE_MIN_FONT_PX)).toFixed(2))
+            );
+      const mainLH = s === 0 ? 1.32 : Number((1.08 + ratio * (1.32 - 1.08)).toFixed(2));
+      const subLH = s === 0 ? 1.25 : Number((1.06 + ratio * (1.25 - 1.06)).toFixed(2));
+      const gapPx = fPx <= 8 ? 0 : fPx <= 10.25 ? 1 : 2;
+
+      profEl.style.fontSize = `${fPx}px`;
+      profEl.style.lineHeight = String(mainLH);
+      glassEl.style.fontSize = `${subPx}px`;
+      glassEl.style.lineHeight = String(subLH);
+      glassEl.style.marginTop = `${gapPx}px`;
+      if (hingeEl) {
+        hingeEl.style.fontSize = `${subPx}px`;
+        hingeEl.style.lineHeight = String(subLH);
+      }
+
+      if (box.scrollHeight <= safeCellHeightPx && box.scrollWidth <= PROFILE_BOX_WIDTH_PX + 1) {
+        const unreadable = fPx < READABILITY_WARNING_FONT_PX;
+        profileFit = {
+          fontSizePx: fPx,
+          secondaryFontSizePx: subPx,
+          lineHeight: mainLH,
+          secondaryLineHeight: subLH,
+          gapPx,
+          isShrunk: s > 0,
+          overflowed: false,
+          unreadable
+        };
+        if (unreadable) {
+          warnings.push({
+            id: `item-${item.id}-profile-tiny`,
+            label: `البند رقم ${itemNumStr} (القطاع والزجاج)`,
+            reason: 'tiny-font'
+          });
+        }
+        break;
+      }
+    }
+
+    if (!profileFit) {
+      profileFit = {
+        fontSizePx: ABSOLUTE_MIN_FONT_PX,
+        secondaryFontSizePx: ABSOLUTE_MIN_FONT_PX,
+        lineHeight: 1.08,
+        secondaryLineHeight: 1.06,
+        gapPx: 0,
+        isShrunk: true,
+        overflowed: true,
+        unreadable: true
+      };
+      warnings.push({
+        id: `item-${item.id}-profile`,
+        label: `البند رقم ${itemNumStr} (القطاع والزجاج)`,
+        reason: 'overflow'
+      });
+    }
+
+    // 3. Measure Addons Details inside fixed cell budget
+    let addonsFit: CellFitStyle = DEFAULT_ADDONS_FIT;
+    if (item.addons.length > 0) {
+      box.innerHTML = '';
+      box.style.cssText = `width:${ADDONS_BOX_WIDTH_PX}px;box-sizing:border-box;direction:rtl;text-align:right;display:flex;flex-direction:column;`;
+
+      const addonNodes = item.addons.map(addonId => {
+        const lineEl = document.createElement('div');
+        lineEl.style.cssText = 'font-weight:700;overflow-wrap:anywhere;word-break:break-word;margin:0;padding:0;';
+        lineEl.textContent = `· ${addons[addonId]?.name || addonId}`;
+        box.appendChild(lineEl);
+        return lineEl;
+      });
+
+      let resolvedAddonsFit: CellFitStyle | null = null;
+      for (let s = 0; s < addonSteps.length; s++) {
+        const fPx = addonSteps[s];
+        const ratio = Math.max(0, Math.min(1, (fPx - ABSOLUTE_MIN_FONT_PX) / (10.5 - ABSOLUTE_MIN_FONT_PX)));
+        const lh = s === 0 ? 1.32 : Number((1.08 + ratio * (1.32 - 1.08)).toFixed(2));
+        const gapPx = fPx <= 8.5 ? 0 : fPx < 10 ? 0.5 : 2;
+
+        box.style.gap = `${gapPx}px`;
+        addonNodes.forEach(node => {
+          node.style.fontSize = `${fPx}px`;
+          node.style.lineHeight = String(lh);
+        });
+
+        if (box.scrollHeight <= safeCellHeightPx && box.scrollWidth <= ADDONS_BOX_WIDTH_PX + 1) {
+          const unreadable = fPx < READABILITY_WARNING_FONT_PX;
+          resolvedAddonsFit = {
+            fontSizePx: fPx,
+            secondaryFontSizePx: fPx,
+            lineHeight: lh,
+            secondaryLineHeight: lh,
+            gapPx,
+            isShrunk: s > 0,
+            overflowed: false,
+            unreadable
+          };
+          if (unreadable) {
+            warnings.push({
+              id: `item-${item.id}-addons-tiny`,
+              label: `البند رقم ${itemNumStr} (الإضافات)`,
+              reason: 'tiny-font'
+            });
+          }
+          break;
+        }
+      }
+
+      if (!resolvedAddonsFit) {
+        resolvedAddonsFit = {
+          fontSizePx: ABSOLUTE_MIN_FONT_PX,
+          secondaryFontSizePx: ABSOLUTE_MIN_FONT_PX,
+          lineHeight: 1.08,
+          secondaryLineHeight: 1.08,
+          gapPx: 0,
+          isShrunk: true,
+          overflowed: true,
+          unreadable: true
+        };
+        warnings.push({
+          id: `item-${item.id}-addons`,
+          label: `البند رقم ${itemNumStr} (الإضافات)`,
+          reason: 'overflow'
+        });
+      }
+      addonsFit = resolvedAddonsFit;
+    }
+
+    itemFits[item.id] = {
+      description: descFit,
+      profileGlass: profileFit,
+      addons: addonsFit,
+      rowOverflowed: descFit.overflowed || profileFit.overflowed || addonsFit.overflowed
+    };
+  });
+
+  // 4. Measure Special Notes & Additional Notes inside 696px width & exact final-page budget
+  let primaryNoteFit: NoteFitStyle = DEFAULT_NOTE_FIT;
+  const additionalNoteFits: Record<string, NoteFitStyle> = {};
+
+  if (totalActiveNotes > 0) {
+    const finalPageMetrics = getPageLayoutMetrics({
+      pageIdx: Math.max(0, totalPages - 1),
+      totalPages,
+      pageItemCount: lastPageItemCount,
+      totalActiveNotes
+    });
+    const dividersPx = Math.max(0, totalActiveNotes - 1) * 10;
+    const perNoteBudgetPx = Math.max(
+      18,
+      Math.floor((finalPageMetrics.notesContentMaxHeightPx - dividersPx) / totalActiveNotes)
+    );
+
+    const measureSingleNote = (text: string, amount: number, warningId: string, warningLabel: string): NoteFitStyle => {
+      box.innerHTML = '';
+      box.style.cssText = [
+        `width:${NOTES_BOX_WIDTH_PX}px`,
+        'box-sizing:border-box',
+        'direction:rtl',
+        'text-align:right',
+        'font-weight:600',
+        'white-space:pre-wrap',
+        'overflow-wrap:anywhere',
+        'word-break:break-word'
+      ].join(';');
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = text;
+      box.appendChild(textSpan);
+
+      if (amount !== 0) {
+        const badgeSpan = document.createElement('span');
+        badgeSpan.style.cssText = 'margin-right:8px;font-weight:800;';
+        badgeSpan.textContent = `(${amount > 0 ? 'إضافة: ' : 'خصم: '}${formatCurrency(Math.abs(amount))})`;
+        box.appendChild(badgeSpan);
+      }
+
+      for (let s = 0; s < noteSteps.length; s++) {
+        const fPx = noteSteps[s];
+        const ratio = Math.max(0, Math.min(1, (fPx - ABSOLUTE_MIN_FONT_PX) / (12 - ABSOLUTE_MIN_FONT_PX)));
+        const lh = s === 0 ? 1.55 : Number((1.12 + ratio * (1.55 - 1.12)).toFixed(2));
+
+        box.style.fontSize = `${fPx}px`;
+        box.style.lineHeight = String(lh);
+
+        if (box.scrollHeight <= perNoteBudgetPx && box.scrollWidth <= NOTES_BOX_WIDTH_PX + 1) {
+          const unreadable = fPx < READABILITY_WARNING_FONT_PX;
+          if (unreadable) {
+            warnings.push({ id: `${warningId}-tiny`, label: warningLabel, reason: 'tiny-font' });
+          }
+          return {
+            fontSizePx: fPx,
+            lineHeight: lh,
+            isShrunk: s > 0,
+            overflowed: false,
+            unreadable
+          };
+        }
+      }
+
+      warnings.push({ id: warningId, label: warningLabel, reason: 'overflow' });
+      return {
+        fontSizePx: ABSOLUTE_MIN_FONT_PX,
+        lineHeight: 1.12,
+        isShrunk: true,
+        overflowed: true,
+        unreadable: true
+      };
+    };
+
+    if (notes) {
+      primaryNoteFit = measureSingleNote(
+        notes,
+        notesAmount,
+        'primary-note',
+        'الملاحظات الخاصة بعرض السعر'
+      );
+    }
+
+    additionalNotes.forEach((n, idx) => {
+      if (!n.text) return;
+      const key = String(n.id || idx);
+      additionalNoteFits[key] = measureSingleNote(
+        n.text,
+        n.amount || 0,
+        `additional-note-${key}`,
+        `ملاحظة إضافية رقم ${idx + 2}`
+      );
+    });
+  }
+
+  box.innerHTML = '';
+  return {
+    itemFits,
+    primaryNoteFit,
+    additionalNoteFits,
+    warnings
+  };
+}
+
+const TRANSPARENT_PIXEL_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+const FALLBACK_LOGO_DATA_URL =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="136" height="136" viewBox="0 0 136 136">' +
+      '<rect width="136" height="136" rx="24" fill="#0F172A"/>' +
+      '<rect x="6" y="6" width="124" height="124" rx="20" fill="none" stroke="#FACC15" stroke-width="4"/>' +
+      '<text x="68" y="66" text-anchor="middle" fill="#FACC15" font-family="Arial, sans-serif" font-weight="900" font-size="38">MH</text>' +
+      '<text x="68" y="100" text-anchor="middle" fill="#FFFFFF" font-family="Arial, sans-serif" font-weight="700" font-size="16">Al-Mekawy</text>' +
+      '</svg>'
+  );
+
+let cachedSafeLogoPromise: Promise<string> | null = null;
+
+/**
+ * Decodes the brand logo once and converts it into a compact, genuine data:image/jpeg URI.
+ * Fixes MIME mismatch (JPEG bytes inside a .png filename) and reduces 880KB base64 bloat to ~14KB
+ * so SVG <foreignObject> serialization stays well below browser data-URL limits.
+ */
+function getSafeLogoDataUrl(): Promise<string> {
+  if (cachedSafeLogoPromise) return cachedSafeLogoPromise;
+
+  cachedSafeLogoPromise = new Promise<string>(resolve => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      resolve(FALLBACK_LOGO_DATA_URL);
+      return;
+    }
+
+    let settled = false;
+    const finish = (val: string) => {
+      if (!settled) {
+        settled = true;
+        resolve(val);
+      }
+    };
+
+    const timer = window.setTimeout(() => finish(FALLBACK_LOGO_DATA_URL), 4000);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      window.clearTimeout(timer);
+      try {
+        const maxDim = 240;
+        const natW = img.naturalWidth || 240;
+        const natH = img.naturalHeight || 240;
+        const scale = Math.min(1, maxDim / Math.max(natW, natH));
+        const targetW = Math.max(1, Math.round(natW * scale));
+        const targetH = Math.max(1, Math.round(natH * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          finish(FALLBACK_LOGO_DATA_URL);
+          return;
+        }
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        finish(dataUrl && dataUrl.startsWith('data:image/') ? dataUrl : FALLBACK_LOGO_DATA_URL);
+      } catch {
+        finish(FALLBACK_LOGO_DATA_URL);
+      }
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      finish(FALLBACK_LOGO_DATA_URL);
+    };
+    img.src = logoUrl;
+  });
+
+  return cachedSafeLogoPromise;
+}
+
+let cachedFontCssPromise: Promise<string> | null = null;
+
+/**
+ * Fetches and deduplicates only Arabic & Latin webfont subsets once per session.
+ * Avoids embedding 35 redundant variable-font blocks (~1.8MB) on every page export.
+ */
+function getCompactFontEmbedCss(): Promise<string> {
+  if (cachedFontCssPromise) return cachedFontCssPromise;
+
+  cachedFontCssPromise = (async () => {
+    if (typeof document === 'undefined' || typeof fetch === 'undefined') return '';
+    try {
+      const fontLinks = Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+      )
+        .map(l => l.href)
+        .filter(href => href && href.includes('fonts.googleapis.com'));
+
+      if (fontLinks.length === 0) return '';
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 3500);
+      let combinedCss = '';
+      try {
+        const responses = await Promise.all(
+          fontLinks.map(href => fetch(href, { signal: controller.signal }).then(r => (r.ok ? r.text() : '')))
+        );
+        combinedCss = responses.join('\n');
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
+      if (!combinedCss) return '';
+
+      // Keep only @font-face blocks needed for Arabic & Basic Latin rendering
+      const blockRegex = /(?:\/\*\s*([a-z-]+)\s*\*\/\s*)?@font-face\s*\{[^}]+\}/gi;
+      const keptBlocks: string[] = [];
+      let match: RegExpExecArray | null;
+      while ((match = blockRegex.exec(combinedCss)) !== null) {
+        const subsetComment = (match[1] || '').toLowerCase();
+        if (
+          !subsetComment ||
+          subsetComment === 'arabic' ||
+          subsetComment === 'latin'
+        ) {
+          keptBlocks.push(match[0]);
+        }
+      }
+
+      if (keptBlocks.length === 0) return '';
+
+      const urlRegex = /url\((['"]?)(https:\/\/[^)'"]+)\1\)/gi;
+      const uniqueUrls = new Set<string>();
+      for (const block of keptBlocks) {
+        let uMatch: RegExpExecArray | null;
+        urlRegex.lastIndex = 0;
+        while ((uMatch = urlRegex.exec(block)) !== null) {
+          uniqueUrls.add(uMatch[2]);
+        }
+      }
+
+      const urlToDataMap = new Map<string, string>();
+      await Promise.all(
+        Array.from(uniqueUrls).map(async fontUrl => {
+          try {
+            const res = await fetch(fontUrl);
+            if (!res.ok) return;
+            const buf = await res.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            let binary = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+            }
+            const mime = fontUrl.includes('.woff2') ? 'font/woff2' : 'font/truetype';
+            urlToDataMap.set(fontUrl, `data:${mime};base64,${window.btoa(binary)}`);
+          } catch {
+            // Ignore individual font subset fetch failures
+          }
+        })
+      );
+
+      return keptBlocks
+        .map(block =>
+          block.replace(urlRegex, (full, _quote, fontUrl) => {
+            const inlined = urlToDataMap.get(fontUrl);
+            return inlined ? `url("${inlined}")` : full;
+          })
+        )
+        .filter(block => !/url\(['"]?https?:\/\//i.test(block))
+        .join('\n');
+    } catch {
+      return '';
+    }
+  })();
+
+  return cachedFontCssPromise;
+}
+
+function utf8SvgToBase64DataUrl(svgXml: string): string {
+  const bytes = new TextEncoder().encode(svgXml);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return `data:image/svg+xml;base64,${window.btoa(binary)}`;
+}
+
+function loadImageElement(src: string, timeoutMs = 8000): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    let done = false;
+    const timer = window.setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error('Image decode timed out during PDF export'));
+      }
+    }, timeoutMs);
+
+    img.onload = async () => {
+      if (done) return;
+      window.clearTimeout(timer);
+      try {
+        if (typeof img.decode === 'function') {
+          await img.decode();
+        }
+      } catch {
+        // onload already succeeded; safe to draw onto canvas
+      }
+      done = true;
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      if (done) return;
+      window.clearTimeout(timer);
+      done = true;
+      reject(new Error('SVG foreignObject image failed to load'));
+    };
+
+    img.src = src;
+  });
+}
+
+async function renderSvgDataUriToJpeg(
+  svgDataUri: string,
+  elW: number,
+  elH: number,
+  pixelRatio: number
+): Promise<string> {
+  const commaIdx = svgDataUri.indexOf(',');
+  const rawEncoded = commaIdx >= 0 ? svgDataUri.slice(commaIdx + 1) : svgDataUri;
+  const decodedSvg = svgDataUri.includes(';base64,')
+    ? new TextDecoder().decode(Uint8Array.from(window.atob(rawEncoded), c => c.charCodeAt(0)))
+    : decodeURIComponent(rawEncoded);
+
+  // Strip illegal XML 1.0 control chars, externalResourcesRequired, and any non-data external URLs
+  const cleanSvg = decodedSvg
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
+    .replace(/\s*externalResourcesRequired="true"/gi, '')
+    .replace(
+      /url\((['"]?)(?:https?:|chrome-extension:|moz-extension:|safari-extension:)[^)'"]*\1\)/gi,
+      'none'
+    );
+
+  const drawToJpeg = (img: HTMLImageElement): string => {
+    const maxCanvasSide = 4096;
+    const effectiveRatio = Math.min(
+      pixelRatio,
+      maxCanvasSide / Math.max(1, elW),
+      maxCanvasSide / Math.max(1, elH)
+    );
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(elW * effectiveRatio));
+    canvas.height = Math.max(1, Math.round(elH * effectiveRatio));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('2D canvas context unavailable');
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.95);
+  };
+
+  // Prefer base64 data URI when under Chromium's 2MB GURL limit (avoids WebKit blob taint);
+  // automatically fall back to Blob URL when larger.
+  const base64Url = utf8SvgToBase64DataUrl(cleanSvg);
+  if (base64Url.length < 1_900_000) {
+    try {
+      const img = await loadImageElement(base64Url);
+      return drawToJpeg(img);
+    } catch {
+      // Fall through to Blob URL loader
+    }
+  }
+
+  const svgBlob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(svgBlob);
+  try {
+    const img = await loadImageElement(blobUrl);
+    return drawToJpeg(img);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
+/**
+ * Normalizes Tailwind CSS v4 modern color functions (oklch, oklab, color-mix) to rgba()
+ * inside a cloned html2canvas document so html2canvas v1.4 never fails parsing stylesheets.
+ */
+function normalizeModernColorsForHtml2Canvas(clonedDoc: Document, clonedPageEl: HTMLElement) {
+  let curr: HTMLElement | null = clonedPageEl;
+  while (curr && curr !== clonedDoc.body) {
+    curr.style.overflow = 'visible';
+    curr.style.opacity = '1';
+    curr.style.visibility = 'visible';
+    if (curr !== clonedPageEl) {
+      curr.style.width = 'auto';
+      curr.style.height = 'auto';
+      curr.style.position = 'static';
+    }
+    curr = curr.parentElement;
+  }
+
+  const probeCanvas = document.createElement('canvas');
+  probeCanvas.width = 1;
+  probeCanvas.height = 1;
+  const ctx = probeCanvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+
+  const cache = new Map<string, string>();
+  const toRgba = (expr: string): string => {
+    const hit = cache.get(expr);
+    if (hit) return hit;
+    try {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = '#000000';
+      ctx.fillStyle = expr;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      const resolved =
+        a === 255
+          ? `rgb(${r}, ${g}, ${b})`
+          : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+      cache.set(expr, resolved);
+      return resolved;
+    } catch {
+      return '#0f172a';
+    }
+  };
+
+  const modernColorRegex = /(?:oklch|oklab|lch|lab|color-mix|color)\([^;{}!]+\)/gi;
+  clonedDoc.querySelectorAll('style').forEach(styleEl => {
+    const txt = styleEl.textContent;
+    if (txt && modernColorRegex.test(txt)) {
+      modernColorRegex.lastIndex = 0;
+      styleEl.textContent = txt.replace(modernColorRegex, match => toRgba(match));
+    }
+  });
+}
+
+function formatErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  if (err && typeof err === 'object' && 'type' in err) {
+    return `DOM Event (${String((err as Event).type)})`;
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
 
 function MiniItemPreview({ item }: { item: CalculatedItem }) {
   const width = item.width || 100;
@@ -254,7 +1253,13 @@ function MiniItemPreview({ item }: { item: CalculatedItem }) {
   };
 
   return (
-    <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="mx-auto block" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={svgWidth}
+      height={svgHeight}
+      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+      className="mx-auto block max-w-full max-h-full"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <rect x={margin} y={margin} width={drawW} height={drawH} fill={frameOuterColor} stroke={frameStrokeColor} strokeWidth="1" rx="1.5" />
       {renderContent()}
     </svg>
@@ -266,7 +1271,8 @@ export default function DetailedQuoteView({
   calculations,
   formatCurrency,
   profiles,
-  addons
+  addons,
+  onBack
 }: Props) {
   const [isExporting, setIsExporting] = React.useState(false);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
@@ -279,6 +1285,20 @@ export default function DetailedQuoteView({
   } | null>(null);
   const [copiedSummary, setCopiedSummary] = React.useState(false);
   const [shareFeedback, setShareFeedback] = React.useState<string | null>(null);
+  const [pdfError, setPdfError] = React.useState<string | null>(null);
+  const [safeLogoSrc, setSafeLogoSrc] = React.useState<string>(logoUrl);
+
+  React.useEffect(() => {
+    let active = true;
+    getSafeLogoDataUrl().then(dataUrl => {
+      if (active && dataUrl) {
+        setSafeLogoSrc(dataUrl);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [currentPage, setCurrentPage] = React.useState(0);
 
@@ -294,7 +1314,7 @@ export default function DetailedQuoteView({
 
   const [pageHeights, setPageHeights] = React.useState<Record<number, number>>({});
 
-  // Split items into pages of up to 12 items per page
+  // Split items into pages of exactly up to 10 items per page
   const itemPages = React.useMemo(() => {
     const allItems = calculations.itemsCalculated;
     if (allItems.length === 0) return [[]];
@@ -306,6 +1326,60 @@ export default function DetailedQuoteView({
   }, [calculations.itemsCalculated]);
 
   const totalPages = itemPages.length;
+  const lastPageItemCount = itemPages[itemPages.length - 1]?.length || 0;
+
+  const {
+    discountType = 'cash',
+    discountValue = 0,
+    notesAmount = 0,
+    notes = '',
+    additionalNotes = []
+  } = customer;
+
+  // Smart Real-DOM Auto-Fit state (identical across Screen Preview, Print & PDF Export)
+  const computeCurrentAutoFit = React.useCallback((): QuoteAutoFitResult => {
+    return measureQuoteAutoFit({
+      items: calculations.itemsCalculated,
+      notes,
+      notesAmount,
+      additionalNotes,
+      profiles,
+      addons,
+      totalPages,
+      lastPageItemCount,
+      formatCurrency
+    });
+  }, [
+    calculations.itemsCalculated,
+    notes,
+    notesAmount,
+    additionalNotes,
+    profiles,
+    addons,
+    totalPages,
+    lastPageItemCount,
+    formatCurrency
+  ]);
+
+  const [autoFit, setAutoFit] = React.useState<QuoteAutoFitResult>(() => computeCurrentAutoFit());
+
+  React.useLayoutEffect(() => {
+    setAutoFit(computeCurrentAutoFit());
+  }, [computeCurrentAutoFit]);
+
+  React.useEffect(() => {
+    let active = true;
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        if (active) {
+          setAutoFit(computeCurrentAutoFit());
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [computeCurrentAutoFit]);
 
   React.useEffect(() => {
     if (currentPage >= totalPages) {
@@ -375,21 +1449,13 @@ export default function DetailedQuoteView({
       window.removeEventListener('orientationchange', handleViewportChange);
       window.visualViewport?.removeEventListener('resize', handleViewportChange);
     };
-  }, [measureAndComputeScale, calculations, customer, totalPages]);
+  }, [measureAndComputeScale, calculations, customer, totalPages, autoFit]);
 
   const quoteNumber = React.useMemo(() => {
     const today = new Date();
     const random = Math.floor(100 + Math.random() * 900);
     return `MH-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}-${random}`;
   }, []);
-
-  const {
-    discountType = 'cash',
-    discountValue = 0,
-    notesAmount = 0,
-    notes = '',
-    additionalNotes = []
-  } = customer;
 
   const discountAmount = React.useMemo(() => {
     const amount =
@@ -533,6 +1599,7 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     if (!isShareOpen) {
       setIsWhatsAppPickerOpen(false);
       setCustomWaPhone('');
+      setPdfError(null);
       setPreparedPdf(prev => {
         if (prev?.blobUrl) {
           URL.revokeObjectURL(prev.blobUrl);
@@ -542,13 +1609,120 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     }
   }, [isShareOpen]);
 
-  const capturePageToPng = async (pageEl: HTMLElement, elW: number, elH: number): Promise<string> => {
+  // Invalidate cached PDF blob whenever customer details or item calculations change
+  React.useEffect(() => {
+    setPreparedPdf(prev => {
+      if (prev?.blobUrl) {
+        URL.revokeObjectURL(prev.blobUrl);
+      }
+      return null;
+    });
+  }, [customer, calculations]);
+
+  const capturePageToJpeg = async (
+    pageEl: HTMLElement,
+    elW: number,
+    elH: number,
+    fontEmbedCSS: string
+  ): Promise<string> => {
+    const pixelRatio = 2;
+    const includeStyleProperties = [
+      'box-sizing',
+      'display',
+      'position',
+      'top',
+      'right',
+      'bottom',
+      'left',
+      'width',
+      'min-width',
+      'max-width',
+      'height',
+      'min-height',
+      'max-height',
+      'margin-top',
+      'margin-right',
+      'margin-bottom',
+      'margin-left',
+      'padding-top',
+      'padding-right',
+      'padding-bottom',
+      'padding-left',
+      'overflow',
+      'overflow-x',
+      'overflow-y',
+      'flex-direction',
+      'flex-wrap',
+      'flex-grow',
+      'flex-shrink',
+      'flex-basis',
+      'align-items',
+      'align-self',
+      'justify-content',
+      'row-gap',
+      'column-gap',
+      'grid-template-columns',
+      'grid-template-rows',
+      'table-layout',
+      'border-collapse',
+      'border-spacing',
+      'vertical-align',
+      'direction',
+      'unicode-bidi',
+      'font-family',
+      'font-size',
+      'font-weight',
+      'font-style',
+      'font-variant-numeric',
+      'line-height',
+      'letter-spacing',
+      'text-align',
+      'text-transform',
+      'text-decoration-line',
+      'white-space',
+      'word-break',
+      'overflow-wrap',
+      '-webkit-line-clamp',
+      '-webkit-box-orient',
+      'color',
+      'background-color',
+      'opacity',
+      'visibility',
+      'object-fit',
+      'border-top-width',
+      'border-right-width',
+      'border-bottom-width',
+      'border-left-width',
+      'border-top-style',
+      'border-right-style',
+      'border-bottom-style',
+      'border-left-style',
+      'border-top-color',
+      'border-right-color',
+      'border-bottom-color',
+      'border-left-color',
+      'border-top-left-radius',
+      'border-top-right-radius',
+      'border-bottom-right-radius',
+      'border-bottom-left-radius',
+      'fill',
+      'fill-opacity',
+      'stroke',
+      'stroke-width',
+      'stroke-dasharray',
+      'stroke-linecap',
+      'stroke-linejoin'
+    ];
     const baseOptions = {
       width: elW,
       height: elH,
-      quality: 0.98,
+      quality: 0.96,
       backgroundColor: '#ffffff',
-      pixelRatio: 2,
+      pixelRatio,
+      cacheBust: false,
+      includeStyleProperties,
+      imagePlaceholder: TRANSPARENT_PIXEL_PNG,
+      onImageErrorHandler: () => true,
       style: {
         transform: 'none',
         transformOrigin: 'top left',
@@ -557,47 +1731,114 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
         margin: '0px'
       }
     };
+
+    // Stage 1: Native SVG foreignObject with deduplicated Arabic/Latin webfonts
     try {
-      return await htmlToImage.toPng(pageEl, baseOptions);
+      const svgUri = await htmlToImage.toSvg(pageEl, {
+        ...baseOptions,
+        ...(fontEmbedCSS ? { fontEmbedCSS } : { skipFonts: true })
+      });
+      return await renderSvgDataUriToJpeg(svgUri, elW, elH, pixelRatio);
     } catch {
-      return await htmlToImage.toPng(pageEl, { ...baseOptions, skipFonts: true });
+      // Fall through to Stage 2
     }
+
+    // Stage 2: Native SVG foreignObject with skipFonts (zero external stylesheet dependency)
+    try {
+      const svgUriNoFonts = await htmlToImage.toSvg(pageEl, {
+        ...baseOptions,
+        skipFonts: true,
+        fontEmbedCSS: ''
+      });
+      return await renderSvgDataUriToJpeg(svgUriNoFonts, elW, elH, pixelRatio);
+    } catch {
+      // Fall through to Stage 3
+    }
+
+    // Stage 3: Direct 2D Canvas Engine fallback via html2canvas (no SVG foreignObject)
+    const fallbackCanvas = await html2canvas(pageEl, {
+      scale: pixelRatio,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      width: elW,
+      height: elH,
+      windowWidth: BASE_PAGE_WIDTH,
+      onclone: (clonedDoc, clonedEl) => {
+        normalizeModernColorsForHtml2Canvas(clonedDoc, clonedEl);
+      }
+    });
+    return fallbackCanvas.toDataURL('image/jpeg', 0.95);
   };
 
   const generatePdfInstance = async (): Promise<jspdf | null> => {
+    setPdfError(null);
+
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise<void>(resolve => setTimeout(resolve, 800))
+      ]);
+    }
+
+    // Ensure auto-fit metrics are freshly measured with active webfonts prior to mounting export pages
+    setAutoFit(computeCurrentAutoFit());
+
+    const resolvedLogoDataUrl = await getSafeLogoDataUrl();
+    if (resolvedLogoDataUrl && resolvedLogoDataUrl !== safeLogoSrc) {
+      setSafeLogoSrc(resolvedLogoDataUrl);
+    }
+
     setIsExporting(true);
     await new Promise<void>(resolve => {
       requestAnimationFrame(() => {
-        setTimeout(() => resolve(), 140);
+        requestAnimationFrame(() => {
+          setTimeout(() => resolve(), 90);
+        });
       });
     });
 
     try {
       const container = exportContainerRef.current;
-      if (!container) return null;
+      if (!container) {
+        setPdfError('تعذر الوصول إلى قالب التصدير، يرجى المحاولة مرة أخرى.');
+        return null;
+      }
 
-      // Ensure all images (such as brand logo) inside export sheets are completely decoded
+      // Guarantee every <img> inside export pages uses an inline data: URI before capture
       const imgs: HTMLImageElement[] = Array.from(container.querySelectorAll('img'));
       await Promise.all(
-        imgs.map((img: HTMLImageElement) =>
-          img.complete
-            ? Promise.resolve()
-            : new Promise<void>(res => {
-                img.onload = () => res();
-                img.onerror = () => res();
-              })
-        )
+        imgs.map((img: HTMLImageElement) => {
+          if (!img.src.startsWith('data:')) {
+            img.src = resolvedLogoDataUrl || FALLBACK_LOGO_DATA_URL;
+          }
+          if (img.complete) return Promise.resolve();
+          return new Promise<void>(res => {
+            img.onload = () => res();
+            img.onerror = () => {
+              img.src = FALLBACK_LOGO_DATA_URL;
+              res();
+            };
+          });
+        })
       );
 
       const targets: HTMLElement[] = Array.from(
         container.querySelectorAll<HTMLElement>('.quotation-export-page')
       );
-      if (targets.length === 0) return null;
+      if (targets.length === 0) {
+        setPdfError('لا توجد صفحات متاحة للتصدير حالياً.');
+        return null;
+      }
+
+      const fontEmbedCSS = await getCompactFontEmbedCss();
 
       const pdf = new jspdf('p', 'mm', 'a4');
       const pdfPageW = 210;
       const pdfPageH = 297;
-      const margin = 4;
+      // Canonical 794x1123 page already includes balanced 28px/32px inner white margins (1:1 96-DPI to A4 mm)
+      const margin = 0;
       const maxW = pdfPageW - margin * 2;
       const maxH = pdfPageH - margin * 2;
 
@@ -606,7 +1847,7 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
         const elW = pageEl.offsetWidth || BASE_PAGE_WIDTH;
         const elH = pageEl.offsetHeight || A4_MIN_HEIGHT;
 
-        const imgData = await capturePageToPng(pageEl, elW, elH);
+        const imgData = await capturePageToJpeg(pageEl, elW, elH, fontEmbedCSS);
 
         if (i > 0) {
           pdf.addPage();
@@ -615,23 +1856,23 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
         let renderW = maxW;
         let renderH = (elH * maxW) / elW;
 
-        if (renderH <= maxH * 1.2) {
+        if (renderH <= maxH * 1.15) {
           if (renderH > maxH) {
             const fitRatio = maxH / renderH;
             renderH = maxH;
             renderW = renderW * fitRatio;
           }
           const offsetX = (pdfPageW - renderW) / 2;
-          pdf.addImage(imgData, 'PNG', offsetX, margin, renderW, renderH, undefined, 'FAST');
+          pdf.addImage(imgData, 'JPEG', offsetX, margin, renderW, renderH, undefined, 'FAST');
         } else {
           let heightLeft = renderH;
           let sliceIdx = 0;
-          pdf.addImage(imgData, 'PNG', margin, margin, renderW, renderH, undefined, 'FAST');
+          pdf.addImage(imgData, 'JPEG', margin, margin, renderW, renderH, undefined, 'FAST');
           heightLeft -= maxH;
           while (heightLeft > 0) {
             sliceIdx++;
             pdf.addPage();
-            pdf.addImage(imgData, 'PNG', margin, margin - sliceIdx * maxH, renderW, renderH, undefined, 'FAST');
+            pdf.addImage(imgData, 'JPEG', margin, margin - sliceIdx * maxH, renderW, renderH, undefined, 'FAST');
             heightLeft -= maxH;
           }
         }
@@ -639,7 +1880,8 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
 
       return pdf;
     } catch (err) {
-      console.error('Error generating PDF:', err);
+      console.warn('PDF generation failed:', formatErrorMessage(err));
+      setPdfError('تعذر تجهيز ملف PDF تلقائياً، يرجى الضغط على إعادة المحاولة.');
       return null;
     } finally {
       setIsExporting(false);
@@ -651,11 +1893,25 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     return `عرض_سعر_المكاوي_${clientNameClean}.pdf`;
   };
 
+  const triggerPdfBlobDownload = (blobUrl: string, fileName: string) => {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDownloadPdf = async () => {
     if (isExporting) return;
     const pdf = await generatePdfInstance();
     if (pdf) {
-      pdf.save(getPdfFileName());
+      const fileName = getPdfFileName();
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      triggerPdfBlobDownload(blobUrl, fileName);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
     }
   };
 
@@ -671,16 +1927,6 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     const nextPrepared = { file, blobUrl, fileName };
     setPreparedPdf(nextPrepared);
     return nextPrepared;
-  };
-
-  const triggerPdfBlobDownload = (blobUrl: string, fileName: string) => {
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = fileName;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const whatsAppPdfMessage = React.useMemo(() => {
@@ -784,7 +2030,12 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     }
   };
 
-  // Canonical A4 Quotation Page Renderer (Fixed 794px geometry — identical across Mobile, Desktop, Export & Print)
+  const totalActiveNotesCount = React.useMemo(() => {
+    const extraCount = additionalNotes.filter(n => Boolean(n.text?.trim())).length;
+    return (notes?.trim() ? 1 : 0) + extraCount;
+  }, [notes, additionalNotes]);
+
+  // Canonical A4 Quotation Page Renderer (Fixed 794x1123px geometry — identical across Mobile, Desktop, Export & Print)
   const renderPageContent = (
     pageItems: CalculatedItem[],
     pageIdx: number,
@@ -798,6 +2049,23 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
     const pageSubtotal = pageItems.reduce((sum, it) => sum + it.itemTotal, 0);
     const displayDate = customer.date || new Date().toISOString().split('T')[0];
 
+    const pageMetrics = getPageLayoutMetrics({
+      pageIdx,
+      totalPages,
+      pageItemCount: Math.max(1, pageItems.length),
+      totalActiveNotes: totalActiveNotesCount
+    });
+    const rowBoxStyle: React.CSSProperties = {
+      height: `${pageMetrics.rowInnerHeightPx}px`,
+      minHeight: `${pageMetrics.rowInnerHeightPx}px`,
+      maxHeight: `${pageMetrics.rowInnerHeightPx}px`
+    };
+    const innerCellTextHeightStyle: React.CSSProperties = {
+      height: `${pageMetrics.cellContentHeightPx}px`,
+      minHeight: `${pageMetrics.cellContentHeightPx}px`,
+      maxHeight: `${pageMetrics.cellContentHeightPx}px`
+    };
+
     return (
       <article
         key={`${mode}-page-${pageIdx}`}
@@ -810,15 +2078,14 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
         }
         dir="rtl"
         data-quote-page={pageIdx + 1}
-        style={
-          mode !== 'print'
-            ? {
-                width: `${BASE_PAGE_WIDTH}px`,
-                minHeight: `${A4_MIN_HEIGHT}px`,
-                padding: '28px 32px'
-              }
-            : undefined
-        }
+        style={{
+          width: `${BASE_PAGE_WIDTH}px`,
+          height: `${A4_MIN_HEIGHT}px`,
+          minHeight: `${A4_MIN_HEIGHT}px`,
+          maxHeight: `${A4_MIN_HEIGHT}px`,
+          padding: '18px 32px',
+          overflow: 'hidden'
+        }}
         className={`pdf-paper-sheet quotation-page-sheet flex flex-col justify-between bg-white text-[#0F172A] box-border ${
           mode === 'screen'
             ? 'border-b border-slate-200 shadow-xs'
@@ -832,24 +2099,23 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
           {isFirstPage ? (
             <>
               {/* Official Full Header (Deterministic Horizontal Row) */}
-              <div className="flex flex-row items-stretch justify-between gap-5 pb-4 border-b-[3px] border-[#0F172A]">
+              <div className="flex flex-row items-stretch justify-between gap-5 pb-2.5 border-b-[3px] border-[#0F172A]">
                 {/* Brand & Quote Metadata */}
                 <div className="flex-1 min-w-0 flex flex-col justify-between text-right">
                   <div className="flex items-center gap-3.5">
                     <img
-                      src={logoUrl}
+                      src={mode === 'export' ? (safeLogoSrc.startsWith('data:') ? safeLogoSrc : FALLBACK_LOGO_DATA_URL) : safeLogoSrc}
                       alt="Al-mekawy Home Logo"
-                      className="w-[68px] h-[68px] rounded-2xl border-2 border-[#0F172A] object-cover shrink-0"
-                      referrerPolicy="no-referrer"
+                      className="w-[64px] h-[64px] rounded-2xl border-2 border-[#0F172A] object-cover shrink-0"
                     />
                     <div className="min-w-0">
-                      <h1 className="text-[28px] font-black text-[#0F172A] leading-tight tracking-tight">
+                      <h1 className="text-[26px] font-black text-[#0F172A] leading-tight tracking-tight">
                         المكاوي هوم
                       </h1>
                       <p className="text-slate-600 font-bold text-xs mt-0.5">
                         Al-Mekawy Home · قطاعات الشبابيك والأبواب UPVC
                       </p>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold mt-2 tabular-nums">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold mt-1.5 tabular-nums">
                         <span>تاريخ العرض: <strong className="font-mono text-[#0F172A]">{displayDate}</strong></span>
                         <span aria-hidden="true">·</span>
                         <span>رقم العرض: <strong className="font-mono text-[#0F172A]">{quoteNumber}</strong></span>
@@ -859,17 +2125,17 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 </div>
 
                 {/* Customer Info Box (Fixed 300px inside 730px inner width) */}
-                <div className="w-[300px] shrink-0 bg-slate-50 border border-slate-200 rounded-xl p-3 text-right flex flex-col justify-center space-y-1.5">
+                <div className="w-[300px] shrink-0 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-right flex flex-col justify-center space-y-1">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-1">
                     <h3 className="text-[11px] font-extrabold text-slate-500">بيانات العميل</h3>
                     <span className="text-[10px] font-bold text-slate-500 tabular-nums">
                       صفحة {pageIdx + 1} من {totalPages}
                     </span>
                   </div>
-                  <div className="space-y-1 text-xs">
+                  <div className="space-y-0.5 text-[11.5px] leading-snug">
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-slate-500 shrink-0 font-semibold">اسم العميل:</span>
-                      <span className="font-extrabold text-[#0F172A] text-left break-words min-w-0">
+                      <span className="font-extrabold text-[#0F172A] text-left break-words min-w-0 line-clamp-2">
                         {customer.name?.trim() || 'عميل المكاوي هوم الموقر'}
                       </span>
                     </div>
@@ -881,12 +2147,12 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                     </div>
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-slate-500 shrink-0 font-semibold">موقع التركيب:</span>
-                      <span className="font-bold text-[#0F172A] text-left break-words min-w-0">
+                      <span className="font-bold text-[#0F172A] text-left break-words min-w-0 line-clamp-2">
                         {customer.address?.trim() || 'بناءً على مقاسات العميل'}
                       </span>
                     </div>
                     {customer.deliveryDate && (
-                      <div className="flex items-start justify-between gap-2 border-t border-dashed border-slate-200 pt-1">
+                      <div className="flex items-start justify-between gap-2 border-t border-dashed border-slate-200 pt-0.5">
                         <span className="text-slate-500 shrink-0 font-semibold">موعد التوريد:</span>
                         <span className="font-extrabold text-[#0F172A] font-mono tabular-nums" dir="ltr">
                           {customer.deliveryDate}
@@ -898,19 +2164,18 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
               </div>
 
               {/* Concise Editorial Intro */}
-              <p className="my-3 text-right text-slate-600 leading-relaxed text-[11.5px]">
+              <p className="my-1.5 text-right text-slate-600 leading-snug text-[11px]">
                 بناءً على طلبكم الكريم، يتشرف <strong className="text-[#0F172A] font-extrabold">المكاوي هوم لأعمال الـ UPVC</strong> بتقديم عرض الأسعار والمواصفات الفنية للفتحات المطلوبة، المصنعة وفق أعلى معايير العزل الصوتي والحراري ومقاومة العوامل الجوية.
               </p>
             </>
           ) : (
             /* Compact Official Continuation Header on Page 2+ */
-            <div className="flex flex-row items-center justify-between gap-4 pb-3.5 mb-4 border-b-[3px] border-[#0F172A]">
+            <div className="flex flex-row items-center justify-between gap-4 pb-2.5 mb-2 border-b-[3px] border-[#0F172A]">
               <div className="flex items-center gap-3 text-right min-w-0">
                 <img
-                  src={logoUrl}
+                  src={mode === 'export' ? (safeLogoSrc.startsWith('data:') ? safeLogoSrc : FALLBACK_LOGO_DATA_URL) : safeLogoSrc}
                   alt="Al-mekawy Home Logo"
                   className="w-12 h-12 rounded-xl border-2 border-[#0F172A] object-cover shrink-0"
-                  referrerPolicy="no-referrer"
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -935,8 +2200,8 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
             </div>
           )}
 
-          {/* Fixed-Layout Items Table (Exact 730px inner column budget — zero horizontal overflow) */}
-          <div className="my-3.5 border-2 border-[#0F172A] rounded-xl overflow-hidden box-border">
+          {/* Fixed-Layout Items Table (Exact 730px inner column budget — strictly uniform row heights, zero horizontal overflow) */}
+          <div className="my-1.5 border-2 border-[#0F172A] rounded-xl overflow-hidden box-border">
             <table className="w-full table-fixed border-collapse text-right text-xs">
               <colgroup>
                 <col className="w-[34px]" />
@@ -949,18 +2214,18 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 <col className="w-[98px]" />
               </colgroup>
               <thead>
-                <tr className="bg-[#0F172A] text-white border-b-2 border-[#0F172A] font-extrabold text-[11px]">
-                  <th className="py-2.5 px-1 text-center border-l border-slate-700">م</th>
-                  <th className="py-2.5 px-2.5 border-l border-slate-700">بيان البند والموقع</th>
-                  <th className="py-2.5 px-1.5 text-center border-l border-slate-700">المقاس (سم)</th>
-                  <th className="py-2.5 px-1.5 text-center border-l border-slate-700">المساحة م²</th>
-                  <th className="py-2.5 px-1 text-center border-l border-slate-700">العدد</th>
-                  <th className="py-2.5 px-2 border-l border-slate-700">القطاع والزجاج</th>
-                  <th className="py-2.5 px-2 border-l border-slate-700">الإضافات</th>
-                  <th className="py-2.5 px-2 text-left">إجمالي البند</th>
+                <tr className="bg-[#0F172A] text-white border-b border-[#0F172A] font-extrabold text-[11px]">
+                  <th className="py-2 px-1 text-center border-l border-slate-700">م</th>
+                  <th className="py-2 px-2.5 border-l border-slate-700">بيان البند والموقع</th>
+                  <th className="py-2 px-1.5 text-center border-l border-slate-700">المقاس (سم)</th>
+                  <th className="py-2 px-1.5 text-center border-l border-slate-700">المساحة م²</th>
+                  <th className="py-2 px-1 text-center border-l border-slate-700">العدد</th>
+                  <th className="py-2 px-2 border-l border-slate-700">القطاع والزجاج</th>
+                  <th className="py-2 px-2 border-l border-slate-700">الإضافات</th>
+                  <th className="py-2 px-2 text-left">إجمالي البند</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody>
                 {pageItems.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-slate-400 font-bold text-sm">
@@ -972,111 +2237,227 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                     const globalIdx = pageIdx * ITEMS_PER_PAGE + idxInPage;
                     const threshold = 1.0;
                     const isMinArea = (item.width * item.height) / 10000 < threshold;
-                    const typeName =
-                      item.itemType === 'armored_door'
-                        ? 'باب مصفح'
-                        : item.itemType === 'door'
-                        ? 'باب'
-                        : item.itemType === 'balcony'
-                        ? 'بلكونة'
-                        : 'شباك';
+                    const typeName = getItemTypeLabel(item.itemType);
+
+                    const itemFit = autoFit.itemFits[item.id];
+                    const descFit = itemFit?.description ?? DEFAULT_DESCRIPTION_FIT;
+                    const profileFit = itemFit?.profileGlass ?? DEFAULT_PROFILE_FIT;
+                    const addonsFit = itemFit?.addons ?? DEFAULT_ADDONS_FIT;
 
                     return (
-                      <tr key={item.id} className="align-middle">
+                      <tr
+                        key={item.id}
+                        className="quote-uniform-row border-b border-slate-200 align-middle"
+                        data-quote-item-row={globalIdx + 1}
+                      >
                         {/* Serial */}
-                        <td className="py-2 px-1 text-center font-mono font-bold text-slate-500 border-l border-slate-100 tabular-nums">
-                          {String(globalIdx + 1).padStart(2, '0')}
+                        <td className="p-0 text-center font-mono font-bold text-slate-500 border-l border-slate-100 tabular-nums align-middle">
+                          <div style={rowBoxStyle} className="w-full px-1 flex items-center justify-center overflow-hidden box-border">
+                            {String(globalIdx + 1).padStart(2, '0')}
+                          </div>
                         </td>
 
-                        {/* Item Title & SVG Preview */}
-                        <td className="py-2 px-2.5 border-l border-slate-100">
-                          <div className="flex items-center justify-between gap-2 min-w-0">
-                            <div className="text-right min-w-0 flex-1">
-                              <div className="font-extrabold text-[#0F172A] text-xs leading-snug break-words">
+                        {/* Item Title & SVG Preview — Independent Per-Item Dynamic Auto-Fit */}
+                        <td className="p-0 border-l border-slate-100 align-middle">
+                          <div
+                            style={rowBoxStyle}
+                            className="w-full px-2.5 py-[2px] flex items-center justify-between gap-2 min-w-0 overflow-hidden box-border"
+                          >
+                            <div
+                              data-autofit-cell="description"
+                              data-autofit-shrunk={descFit.isShrunk ? 'true' : 'false'}
+                              data-autofit-overflow={descFit.overflowed ? 'true' : 'false'}
+                              data-autofit-fontsize={descFit.fontSizePx}
+                              className="text-right min-w-0 flex-1 flex flex-col overflow-hidden box-border"
+                              style={{
+                                ...innerCellTextHeightStyle,
+                                justifyContent: descFit.overflowed ? 'flex-start' : 'center'
+                              }}
+                            >
+                              <div
+                                className="font-extrabold text-[#0F172A] whitespace-pre-wrap"
+                                style={{
+                                  fontSize: `${descFit.fontSizePx}px`,
+                                  lineHeight: descFit.lineHeight,
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
                                 {item.title}
                               </div>
-                              <div className="text-[10.5px] text-slate-500 font-semibold mt-0.5">
+                              <div
+                                className="text-slate-500 font-semibold"
+                                style={{
+                                  fontSize: `${descFit.secondaryFontSizePx}px`,
+                                  lineHeight: descFit.secondaryLineHeight,
+                                  marginTop: `${descFit.gapPx}px`,
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
                                 {typeName} · فتح {item.opening}
                               </div>
                             </div>
-                            <div className="shrink-0 w-[44px] h-[44px] bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-0.5">
+                            <div
+                              style={{
+                                width: `${pageMetrics.svgBoxSizePx}px`,
+                                height: `${pageMetrics.svgBoxSizePx}px`
+                              }}
+                              className="shrink-0 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-0.5 overflow-hidden box-border"
+                            >
                               <MiniItemPreview item={item} />
                             </div>
                           </div>
                         </td>
 
-                        {/* Dimensions */}
-                        <td className="py-2 px-1.5 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-[11.5px] tabular-nums" dir="ltr">
-                          {item.width} × {item.height}
-                        </td>
-
-                        {/* Area */}
-                        <td className="py-2 px-1.5 text-center border-l border-slate-100 tabular-nums">
-                          <div className="font-bold text-[#0F172A] text-[11.5px]">{item.area.toFixed(2)} م²</div>
-                          {isMinArea && (
-                            <div className="text-[9.5px] text-amber-700 font-bold leading-tight mt-0.5">
-                              أدنى {threshold.toFixed(1)} م²
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Quantity */}
-                        <td className="py-2 px-1 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-xs tabular-nums">
-                          {item.quantity || 1}
-                        </td>
-
-                        {/* Profile & Glass */}
-                        <td className="py-2 px-2 border-l border-slate-100 text-[11px] leading-snug break-words">
-                          <div className="font-extrabold text-[#0F172A]">
-                            {profiles[item.profile]?.name || item.profile}
+                        {/* Dimensions (Unchanged font size, strictly uniform row box) */}
+                        <td className="p-0 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-[11.5px] tabular-nums align-middle" dir="ltr">
+                          <div style={rowBoxStyle} className="w-full px-1.5 flex items-center justify-center overflow-hidden box-border">
+                            {item.width} × {item.height}
                           </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">
-                            {item.innerType === 'panel'
-                              ? 'بنل بالكامل'
-                              : item.innerType === 'panel_glass'
-                              ? `بنل + ${item.glassType}`
-                              : item.glassType}
-                          </div>
-                          {item.opening === 'مفصلي' && (
-                            <div className="text-[10px] text-slate-500 font-semibold">
-                              {item.hingePanes || 'ضلفة'}
-                            </div>
-                          )}
                         </td>
 
-                        {/* Addons */}
-                        <td className="py-2 px-2 border-l border-slate-100 text-[10.5px] text-slate-600 leading-snug break-words">
-                          {item.addons.length > 0 ? (
-                            <div className="space-y-0.5">
-                              {item.addons.map(addonId => (
-                                <div key={addonId} className="font-bold text-slate-700">
-                                  · {addons[addonId]?.name || addonId}
+                        {/* Area (Unchanged font size, strictly uniform row box) */}
+                        <td className="p-0 text-center border-l border-slate-100 tabular-nums align-middle">
+                          <div style={rowBoxStyle} className="w-full px-1.5 flex flex-col items-center justify-center overflow-hidden box-border">
+                            <div className="font-bold text-[#0F172A] text-[11.5px] leading-tight">{item.area.toFixed(2)} م²</div>
+                            {isMinArea && (
+                              <div className="text-[9.5px] text-amber-700 font-bold leading-tight mt-0.5">
+                                أدنى {threshold.toFixed(1)} م²
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Quantity (Unchanged font size, strictly uniform row box) */}
+                        <td className="p-0 text-center font-mono font-bold text-[#0F172A] border-l border-slate-100 text-xs tabular-nums align-middle">
+                          <div style={rowBoxStyle} className="w-full px-1 flex items-center justify-center overflow-hidden box-border">
+                            {item.quantity || 1}
+                          </div>
+                        </td>
+
+                        {/* Profile & Glass — Independent Per-Item Dynamic Auto-Fit */}
+                        <td className="p-0 border-l border-slate-100 align-middle">
+                          <div style={rowBoxStyle} className="w-full px-2 py-[2px] flex flex-col justify-center overflow-hidden box-border">
+                            <div
+                              data-autofit-cell="profile-glass"
+                              data-autofit-shrunk={profileFit.isShrunk ? 'true' : 'false'}
+                              data-autofit-overflow={profileFit.overflowed ? 'true' : 'false'}
+                              data-autofit-fontsize={profileFit.fontSizePx}
+                              className="flex flex-col overflow-hidden box-border"
+                              style={{
+                                ...innerCellTextHeightStyle,
+                                justifyContent: profileFit.overflowed ? 'flex-start' : 'center'
+                              }}
+                            >
+                              <div
+                                className="font-extrabold text-[#0F172A]"
+                                style={{
+                                  fontSize: `${profileFit.fontSizePx}px`,
+                                  lineHeight: profileFit.lineHeight,
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {profiles[item.profile]?.name || item.profile}
+                              </div>
+                              <div
+                                className="text-slate-500"
+                                style={{
+                                  fontSize: `${profileFit.secondaryFontSizePx}px`,
+                                  lineHeight: profileFit.secondaryLineHeight,
+                                  marginTop: `${profileFit.gapPx}px`,
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {item.innerType === 'panel'
+                                  ? 'بنل بالكامل'
+                                  : item.innerType === 'panel_glass'
+                                  ? `بنل + ${item.glassType}`
+                                  : item.glassType}
+                              </div>
+                              {item.opening === 'مفصلي' && (
+                                <div
+                                  className="text-slate-500 font-semibold"
+                                  style={{
+                                    fontSize: `${profileFit.secondaryFontSizePx}px`,
+                                    lineHeight: profileFit.secondaryLineHeight,
+                                    overflowWrap: 'anywhere',
+                                    wordBreak: 'break-word'
+                                  }}
+                                >
+                                  {item.hingePanes || 'ضلفة'}
                                 </div>
-                              ))}
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
+                          </div>
                         </td>
 
-                        {/* Item Total */}
-                        <td className="py-2 px-2 text-left tabular-nums">
-                          <div className="font-black text-[#0F172A] text-xs leading-tight">
-                            {formatCurrency(item.itemTotal)}
-                          </div>
-                          <div className="text-[9.5px] text-slate-500 mt-0.5">
-                            {formatCurrency(item.profilePrice + item.addonsPrice)}/م²
-                          </div>
-                          {item.quantity && item.quantity > 1 ? (
-                            <div className="text-[9.5px] text-slate-500 font-bold">
-                              ({formatCurrency(item.itemTotal / item.quantity)} × {item.quantity})
+                        {/* Addons — Independent Per-Item Dynamic Auto-Fit */}
+                        <td className="p-0 border-l border-slate-100 text-slate-600 align-middle">
+                          <div style={rowBoxStyle} className="w-full px-2 py-[2px] flex flex-col justify-center overflow-hidden box-border">
+                            <div
+                              data-autofit-cell="addons"
+                              data-autofit-shrunk={addonsFit.isShrunk ? 'true' : 'false'}
+                              data-autofit-overflow={addonsFit.overflowed ? 'true' : 'false'}
+                              data-autofit-fontsize={addonsFit.fontSizePx}
+                              className="flex flex-col overflow-hidden box-border"
+                              style={{
+                                ...innerCellTextHeightStyle,
+                                justifyContent: addonsFit.overflowed ? 'flex-start' : 'center'
+                              }}
+                            >
+                              {item.addons.length > 0 ? (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: `${addonsFit.gapPx}px`
+                                  }}
+                                >
+                                  {item.addons.map(addonId => (
+                                    <div
+                                      key={addonId}
+                                      className="font-bold text-slate-700"
+                                      style={{
+                                        fontSize: `${addonsFit.fontSizePx}px`,
+                                        lineHeight: addonsFit.lineHeight,
+                                        overflowWrap: 'anywhere',
+                                        wordBreak: 'break-word'
+                                      }}
+                                    >
+                                      · {addons[addonId]?.name || addonId}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-[10.5px]">—</span>
+                              )}
                             </div>
-                          ) : null}
-                          {item.flatAddonsPrice && item.flatAddonsPrice > 0 ? (
-                            <div className="text-[9.5px] text-emerald-700 font-bold">
-                              +{formatCurrency(item.flatAddonsPrice)} مقطوع
+                          </div>
+                        </td>
+
+                        {/* Item Total (Font sizes untouched, strictly uniform row box) */}
+                        <td className="p-0 text-left tabular-nums align-middle">
+                          <div style={rowBoxStyle} className="w-full px-2 py-[2px] flex flex-col justify-center overflow-hidden box-border">
+                            <div className="font-black text-[#0F172A] text-[11.5px] leading-[1.15]">
+                              {formatCurrency(item.itemTotal)}
                             </div>
-                          ) : null}
+                            <div className="text-[9px] text-slate-500 leading-[1.15] mt-0.5">
+                              {formatCurrency(item.profilePrice + item.addonsPrice)}/م²
+                            </div>
+                            {item.quantity && item.quantity > 1 ? (
+                              <div className="text-[9px] text-slate-500 font-bold leading-[1.15]">
+                                ({formatCurrency(item.itemTotal / item.quantity)} × {item.quantity})
+                              </div>
+                            ) : null}
+                            {item.flatAddonsPrice && item.flatAddonsPrice > 0 ? (
+                              <div className="text-[9px] text-emerald-700 font-bold leading-[1.15]">
+                                +{formatCurrency(item.flatAddonsPrice)} مقطوع
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1088,7 +2469,7 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
 
           {/* Intermediate Page Continuation Bar vs Final Page Grand Summary & Terms */}
           {!isLastPage ? (
-            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-bold text-slate-700 tabular-nums">
+            <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 flex items-center justify-between gap-3 text-xs font-bold text-slate-700 tabular-nums">
               <div className="flex items-center gap-2.5">
                 <span>بنود الصفحة: <strong className="text-[#0F172A] font-extrabold">{pageItems.length}</strong> ({pageStartNum}–{pageEndNum})</span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
@@ -1103,49 +2484,49 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
           ) : (
             <>
               {/* Financial Summary Banner */}
-              <div className="bg-[#0F172A] text-white rounded-xl p-4 flex flex-row items-center justify-between gap-4 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-[#0F172A] print:break-inside-avoid tabular-nums">
+              <div className="bg-[#0F172A] text-white rounded-xl py-2.5 px-4 flex flex-row items-center justify-between gap-4 print:bg-slate-100 print:text-[#0F172A] print:border-2 print:border-[#0F172A] print:break-inside-avoid tabular-nums">
                 <div className="text-right shrink-0">
-                  <h4 className="font-black text-base text-white print:text-[#0F172A]">الملخص المالي وإجمالي المسطحات</h4>
-                  <p className="text-slate-300 text-[11px] print:text-slate-600 mt-0.5">
+                  <h4 className="font-black text-[15px] leading-tight text-white print:text-[#0F172A]">الملخص المالي وإجمالي المسطحات</h4>
+                  <p className="text-slate-300 text-[10.5px] leading-tight print:text-slate-600 mt-0.5">
                     إجمالي عدد البنود: {calculations.itemsCalculated.length} · إجمالي المساحة: <span className="font-mono font-bold" dir="ltr">{calculations.totalArea.toFixed(2)} m²</span>
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
                   {discountValue > 0 || totalNotesAmount !== 0 ? (
                     <>
                       <div className="text-right">
-                        <span className="text-[10px] text-slate-400 print:text-slate-600 font-bold block">الإجمالي قبل الخصم</span>
-                        <span className="text-sm font-bold font-mono text-slate-200 print:text-slate-800">{formatCurrency(calculations.totalPrice)}</span>
+                        <span className="text-[10px] text-slate-400 print:text-slate-600 font-bold block leading-tight">الإجمالي قبل الخصم</span>
+                        <span className="text-xs font-bold font-mono text-slate-200 print:text-slate-800">{formatCurrency(calculations.totalPrice)}</span>
                       </div>
 
                       {discountValue > 0 && (
-                        <div className="text-right border-r border-slate-700 print:border-slate-300 pr-4">
-                          <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block">قيمة الخصم</span>
-                          <span className="text-sm font-bold font-mono text-emerald-300 print:text-emerald-800">- {formatCurrency(discountAmount)}</span>
+                        <div className="text-right border-r border-slate-700 print:border-slate-300 pr-3.5">
+                          <span className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold block leading-tight">قيمة الخصم</span>
+                          <span className="text-xs font-bold font-mono text-emerald-300 print:text-emerald-800">- {formatCurrency(discountAmount)}</span>
                         </div>
                       )}
 
                       {totalNotesAmount !== 0 && (
-                        <div className="text-right border-r border-slate-700 print:border-slate-300 pr-4">
-                          <span className="text-[10px] text-sky-300 print:text-sky-700 font-bold block">إضافات الملاحظات</span>
-                          <span className="text-sm font-bold font-mono text-sky-200 print:text-sky-800">
+                        <div className="text-right border-r border-slate-700 print:border-slate-300 pr-3.5">
+                          <span className="text-[10px] text-sky-300 print:text-sky-700 font-bold block leading-tight">إضافات الملاحظات</span>
+                          <span className="text-xs font-bold font-mono text-sky-200 print:text-sky-800">
                             {totalNotesAmount > 0 ? '+' : ''}{formatCurrency(totalNotesAmount)}
                           </span>
                         </div>
                       )}
 
-                      <div className="text-right border-r border-slate-700 print:border-slate-300 pr-4">
-                        <span className="text-[10px] text-[#FACC15] print:text-slate-600 font-extrabold block">صافي القيمة النهائية</span>
-                        <span className="text-2xl font-black text-[#FACC15] print:text-[#0F172A] leading-none">
+                      <div className="text-right border-r border-slate-700 print:border-slate-300 pr-3.5">
+                        <span className="text-[10px] text-[#FACC15] print:text-slate-600 font-extrabold block leading-tight">صافي القيمة النهائية</span>
+                        <span className="text-xl font-black text-[#FACC15] print:text-[#0F172A] leading-none">
                           {formatCurrency(finalPrice)}
                         </span>
                       </div>
                     </>
                   ) : (
                     <div className="text-right">
-                      <span className="text-[10px] text-[#FACC15] print:text-slate-600 font-extrabold block mb-0.5">صافي القيمة النهائية</span>
-                      <span className="text-2xl font-black text-[#FACC15] print:text-[#0F172A] leading-none">
+                      <span className="text-[10px] text-[#FACC15] print:text-slate-600 font-extrabold block leading-tight mb-0.5">صافي القيمة النهائية</span>
+                      <span className="text-xl font-black text-[#FACC15] print:text-[#0F172A] leading-none">
                         {formatCurrency(calculations.totalPrice)}
                       </span>
                     </div>
@@ -1153,47 +2534,82 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 </div>
               </div>
 
-              {/* Optional Customer & Technical Notes */}
+              {/* Optional Customer & Technical Notes — Independent Dynamic Auto-Fit */}
               {(notes || additionalNotes.some(n => n.text)) && (
-                <div className="mt-3.5 bg-slate-50 border border-slate-200 p-3.5 rounded-xl text-right space-y-2 print:break-inside-avoid">
-                  <h3 className="text-[11px] font-extrabold text-[#0F172A]">
+                <div className="mt-2 bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-right space-y-1 print:break-inside-avoid overflow-hidden box-border">
+                  <h3 className="text-[10.5px] font-extrabold text-[#0F172A] leading-tight">
                     ملاحظات خاصة وتفاصيل إضافية:
                   </h3>
 
-                  {notes && (
-                    <div className="text-xs text-slate-700 font-semibold whitespace-pre-wrap leading-relaxed">
-                      {notes}
-                      {notesAmount !== 0 && (
-                        <span className="mr-2 font-extrabold text-[#0F172A] tabular-nums">
-                          ({notesAmount > 0 ? 'إضافة: ' : 'خصم: '}{formatCurrency(Math.abs(notesAmount))})
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {additionalNotes.map((note, idx) =>
-                    note.text ? (
-                      <div key={note.id || idx} className="pt-1.5 border-t border-dashed border-slate-200 text-xs text-slate-700 font-semibold whitespace-pre-wrap leading-relaxed">
-                        {note.text}
-                        {note.amount !== 0 && (
+                  <div
+                    className="space-y-1 overflow-hidden box-border"
+                    style={
+                      pageMetrics.notesContentMaxHeightPx > 0
+                        ? { maxHeight: `${pageMetrics.notesContentMaxHeightPx}px` }
+                        : undefined
+                    }
+                  >
+                    {notes && (
+                      <div
+                        data-autofit-cell="primary-note"
+                        data-autofit-shrunk={autoFit.primaryNoteFit.isShrunk ? 'true' : 'false'}
+                        data-autofit-overflow={autoFit.primaryNoteFit.overflowed ? 'true' : 'false'}
+                        className="text-slate-700 font-semibold whitespace-pre-wrap"
+                        style={{
+                          fontSize: `${autoFit.primaryNoteFit.fontSizePx}px`,
+                          lineHeight: autoFit.primaryNoteFit.lineHeight,
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word'
+                        }}
+                      >
+                        {notes}
+                        {notesAmount !== 0 && (
                           <span className="mr-2 font-extrabold text-[#0F172A] tabular-nums">
-                            ({note.amount > 0 ? 'إضافة: ' : 'خصم: '}{formatCurrency(Math.abs(note.amount))})
+                            ({notesAmount > 0 ? 'إضافة: ' : 'خصم: '}{formatCurrency(Math.abs(notesAmount))})
                           </span>
                         )}
                       </div>
-                    ) : null
-                  )}
+                    )}
+
+                    {additionalNotes.map((note, idx) => {
+                      if (!note.text) return null;
+                      const noteKey = String(note.id || idx);
+                      const nFit = autoFit.additionalNoteFits[noteKey] ?? DEFAULT_NOTE_FIT;
+                      return (
+                        <div
+                          key={noteKey}
+                          data-autofit-cell={`additional-note-${idx}`}
+                          data-autofit-shrunk={nFit.isShrunk ? 'true' : 'false'}
+                          data-autofit-overflow={nFit.overflowed ? 'true' : 'false'}
+                          className="pt-1 border-t border-dashed border-slate-200 text-slate-700 font-semibold whitespace-pre-wrap"
+                          style={{
+                            fontSize: `${nFit.fontSizePx}px`,
+                            lineHeight: nFit.lineHeight,
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word'
+                          }}
+                        >
+                          {note.text}
+                          {note.amount !== 0 && (
+                            <span className="mr-2 font-extrabold text-[#0F172A] tabular-nums">
+                              ({note.amount > 0 ? 'إضافة: ' : 'خصم: '}{formatCurrency(Math.abs(note.amount))})
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
               {/* Terms & Specifications */}
-              <div className="mt-4 border-t border-slate-200 pt-3.5 text-right terms-block print:break-inside-avoid">
-                <h3 className="text-[11px] font-extrabold text-slate-500 mb-2">
+              <div className="mt-2 border-t border-slate-200 pt-2 text-right terms-block print:break-inside-avoid">
+                <h3 className="text-[10.5px] font-extrabold text-slate-500 mb-1">
                   الشروط والمواصفات الفنية وضمان المكاوي هوم
                 </h3>
-                <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-[10.5px] text-slate-600 leading-snug">
                   <p><strong className="text-[#0F172A]">· الضمان المعتمد:</strong> ضمان 10 سنوات على قطاعات الـ UPVC ضد تغير اللون وعيوب التصنيع وثبات المقطع.</p>
-                  <p><strong className="text-[#0F172A]">· الإكسسوارات:</strong> إكسسوارات تركية أصلية مقاومة للصدأ <span className="font-mono text-[10px] text-[#0F172A]">[VORNE · FORNAX · GIVESS · ROTEX]</span>.</p>
+                  <p><strong className="text-[#0F172A]">· الإكسسوارات:</strong> إكسسوارات تركية أصلية مقاومة للصدأ <span className="font-mono text-[9.5px] text-[#0F172A]">[VORNE · FORNAX · GIVESS · ROTEX]</span>.</p>
                   <p><strong className="text-[#0F172A]">· إحكام العزل:</strong> جوانات كاوتشوك مزدوجة تمنع تسريب الأتربة ومياه الأمطار وتعزل الضوضاء الخارجية.</p>
                   <p><strong className="text-[#0F172A]">· رفع المقاسات:</strong> هذا العرض مبدئي وفق مقاساتكم الأولية، ويتم رفع المقاسات النهائية هندسياً بالموقع مجاناً.</p>
                 </div>
@@ -1203,25 +2619,25 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
         </div>
 
         {/* Bottom Signatures (Final Page) & Official Footer Citation (Every Page) */}
-        <div className="w-full pt-3 mt-3">
+        <div className="w-full pt-1.5 mt-1.5">
           {isLastPage && (
-            <div className="grid grid-cols-2 gap-8 text-center text-xs font-bold border-t border-slate-200 pt-4 mb-3 signatures-block print:break-inside-avoid">
+            <div className="grid grid-cols-2 gap-8 text-center text-xs font-bold border-t border-slate-200 pt-2 mb-2 signatures-block print:break-inside-avoid">
               <div>
-                <p className="text-slate-500 mb-6 font-extrabold text-[11px]">توقيع واعتماد العميل</p>
+                <p className="text-slate-500 mb-3.5 font-extrabold text-[10.5px]">توقيع واعتماد العميل</p>
                 <div className="border-b border-dashed border-slate-400 w-44 mx-auto" />
-                <p className="text-[#0F172A] text-xs font-extrabold mt-1.5">
+                <p className="text-[#0F172A] text-[11.5px] font-extrabold mt-1 truncate">
                   {customer.name?.trim() || 'العميل المحترم'}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 mb-6 font-extrabold text-[11px]">اعتماد المكاوي هوم</p>
+                <p className="text-slate-500 mb-3.5 font-extrabold text-[10.5px]">اعتماد المكاوي هوم</p>
                 <div className="border-b border-dashed border-slate-400 w-44 mx-auto" />
-                <p className="text-[#0F172A] font-extrabold text-xs mt-1.5">مهندس / حامد مكاوي</p>
+                <p className="text-[#0F172A] font-extrabold text-[11.5px] mt-1">مهندس / حامد مكاوي</p>
               </div>
             </div>
           )}
 
-          <div className="border-t border-slate-200 pt-2.5 flex items-center justify-between text-[10px] text-slate-500 font-bold tabular-nums">
+          <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-[10px] text-slate-500 font-bold tabular-nums">
             <div className="flex items-center gap-2" dir="ltr">
               <span>© {new Date().getFullYear()} Al-Mekawy Home</span>
               <span aria-hidden="true">·</span>
@@ -1316,6 +2732,66 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
           </div>
         </div>
       </div>
+
+      {/* Content Length & Legibility Review Notice (Screen Only — Never deletes item data or alters row heights) */}
+      {autoFit.warnings.length > 0 && (
+        <div
+          role="alert"
+          data-autofit-warning-banner="true"
+          className="bg-amber-50 border-b border-amber-300 px-3.5 py-2.5 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs text-amber-950 print:hidden"
+        >
+          <div className="flex items-start gap-2.5 min-w-0">
+            <AlertTriangle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="min-w-0 space-y-0.5">
+              <p className="font-black text-amber-950 leading-snug">
+                {autoFit.warnings.some(w => w.reason === 'overflow')
+                  ? 'تنبيه مراجعة وصف البند: بعض النصوص طويلة جداً وتتجاوز السعة القصوى للمساحة الثابتة مع الحفاظ على ثبات ارتفاع الصفوف'
+                  : 'تنبيه وضوح القراءة: تم تصغير خط بعض البنود إلى حجم دقيق جداً لاحتواء كامل النص داخل المساحة الثابتة'}
+              </p>
+              <p className="text-[11px] font-bold text-amber-800 leading-relaxed break-words">
+                المواضع المتأثرة: {autoFit.warnings.map(w => w.label).join(' · ')} — يُفضل مراجعة النص أو اختصاره لضمان أفضل وضوح في المعاينة وملف الـ PDF.
+              </p>
+            </div>
+          </div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="self-start sm:self-center shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black transition-colors cursor-pointer whitespace-nowrap"
+            >
+              مراجعة وتعديل البنود
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Inline PDF Export Error Banner (only when Share modal is closed) */}
+      {pdfError && !isShareOpen && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center justify-between gap-3 text-xs font-bold text-red-800 print:hidden">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={15} className="text-red-600 shrink-0" />
+            <span>{pdfError}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-extrabold flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw size={12} />
+              <span>إعادة المحاولة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPdfError(null)}
+              className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+              aria-label="إغلاق التنبيه"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. Multi-Page Switcher Bar (Rendered cleanly when quote spans multiple pages) */}
       {totalPages > 1 && (
@@ -1415,9 +2891,26 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
       {isExporting && (
         <div
           aria-hidden="true"
-          className="fixed top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none print:hidden"
+          dir="ltr"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: 0,
+            height: 0,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: -50
+          }}
+          className="print:hidden"
         >
-          <div ref={exportContainerRef} style={{ width: `${BASE_PAGE_WIDTH}px` }}>
+          <div
+            ref={exportContainerRef}
+            style={{
+              width: `${BASE_PAGE_WIDTH}px`,
+              backgroundColor: '#ffffff'
+            }}
+          >
             {itemPages.map((pageItems, pageIdx) => renderPageContent(pageItems, pageIdx, 'export'))}
           </div>
         </div>
@@ -1450,6 +2943,15 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 <X size={18} />
               </button>
             </div>
+
+            {autoFit.warnings.length > 0 && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-[11px] font-bold text-amber-900 flex items-start gap-2">
+                <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  تنبيه: محتوى ({autoFit.warnings.map(w => w.label).join(' · ')}) طويل جداً ويُنصح بمراجعته أو اختصاره لضمان أوضح قراءة داخل المساحة الثابتة للبند.
+                </span>
+              </div>
+            )}
 
             <div className="space-y-2.5">
               <button
@@ -1487,10 +2989,27 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 {isWhatsAppPickerOpen && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2.5">
                     {!preparedPdf ? (
-                      <div className="flex items-center justify-center gap-2 py-3 text-xs font-extrabold text-emerald-800">
-                        <span className="w-4 h-4 border-2 border-[#25D366] border-t-transparent rounded-full animate-spin shrink-0" />
-                        <span>جاري تجهيز ملف الـ PDF للمشاركة...</span>
-                      </div>
+                      pdfError && !isExporting ? (
+                        <div className="py-2.5 px-2 text-center space-y-2">
+                          <p className="text-xs font-extrabold text-red-700 flex items-center justify-center gap-1.5">
+                            <AlertCircle size={14} className="shrink-0" />
+                            <span>{pdfError}</span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => ensurePreparedPdf()}
+                            className="min-h-[36px] px-3.5 rounded-lg bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-black inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <RefreshCw size={13} />
+                            <span>إعادة المحاولة</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 py-3 text-xs font-extrabold text-emerald-800">
+                          <span className="w-4 h-4 border-2 border-[#25D366] border-t-transparent rounded-full animate-spin shrink-0" />
+                          <span>جاري تجهيز ملف الـ PDF للمشاركة...</span>
+                        </div>
+                      )
                     ) : (
                       <>
                         <div className="flex items-center justify-between text-[11px] font-extrabold text-emerald-900 px-0.5">
@@ -1610,6 +3129,20 @@ ${discountStr}${notesStr}صافي القيمة النهائية: ${formatCurrenc
                 </span>
               </button>
             </div>
+
+            {pdfError && !isWhatsAppPickerOpen && (
+              <div className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                <span>{pdfError}</span>
+                <button
+                  type="button"
+                  onClick={handleSharePdfFile}
+                  className="shrink-0 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-extrabold flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  <span>إعادة</span>
+                </button>
+              </div>
+            )}
 
             {shareFeedback && (
               <p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center">

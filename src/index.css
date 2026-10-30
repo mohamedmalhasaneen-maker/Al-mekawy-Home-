@@ -213,17 +213,23 @@ body {
   }
 }
 
+/* Strict uniform table row height lock across preview, print, and PDF export */
+.quote-uniform-row > td {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  vertical-align: middle !important;
+}
+
 /* Print Optimization and Page Break Configurations */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
+    margin: 0;
   }
 
   body {
     background-color: #ffffff !important;
     color: #0c111d !important;
-    font-size: 11.5px !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -273,12 +279,17 @@ body {
   }
 
   .quotation-page-sheet {
-    width: 100% !important;
-    min-height: 0 !important;
+    width: 794px !important;
+    max-width: 100% !important;
+    height: 1123px !important;
+    min-height: 1123px !important;
+    max-height: 1123px !important;
+    margin: 0 auto !important;
+    padding: 18px 32px !important;
+    overflow: hidden !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
-    padding: 4mm 2mm !important;
   }
 
   .quotation-page-break {
